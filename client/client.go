@@ -4,6 +4,9 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -11,14 +14,22 @@ const (
 	VERSION      = "v0.0.1"    //版本号
 	_ReedBufSize = 1024 * 1024 //读信息通道缓存字节数
 	//功能码定义(Function Code)
-	_FC_WriteSingleKey  = 1 //写单个标签
-	_FC_WriteMultiKey   = 2 //写多个标签
-	_FC_ReadSingleKey   = 3 //读取单个标签
-	_FC_ReadMultiKey    = 4 //读取多个标签
-	_FC_DeleteSingleKey = 5 //删除单个标签
-	_FC_DeleteMultiKey  = 6 //删除多个标签
-	_FC_Login           = 7 //登录
-	_FC_Ping            = 8 //测试,获取当前时间的UNIX毫秒值
+	_FC_Ping            = 0x01 //测试,获取当前时间的UNIX毫秒值
+	_FC_Login           = 0x02 //登录
+	_FC_WriteSingleKey  = 0x03 //写单个标签
+	_FC_WriteMultiKey   = 0x04 //写多个标签
+	_FC_ReadSingleKey   = 0x05 //读取单个标签
+	_FC_ReadMultiKey    = 0x06 //读取多个标签
+	_FC_DeleteSingleKey = 0x07 //删除单个标签
+	_FC_DeleteMultiKey  = 0x08 //删除多个标签
+	_FC_SelfIncrease    = 0x09 //标签值自增
+	_FC_SelfDecrease    = 0x0A //标签自减
+	_FC_PipePush        = 0x0B //往管道中压入数据
+	_FC_PipeFiFoPull    = 0x0C //先进先出拉取数据
+	_FC_PipeFiLoPull    = 0x0D //先进后出拉取数据
+	_FC_PipeLenght      = 0x0E //获取管道的长度
+	_FC_GetKeys         = 0x10 //获取所有已经存在的键
+	_FC_GetUsers        = 0x11 //获取所有已经存在的用户名
 )
 
 //响应数据的结构
@@ -53,12 +64,14 @@ type ConnPool struct {
 /*******************************************************************************
 - 功能:实例化工作池
 - 参数:
-	[hostname]  字符串，输入，GOLDEN 数据平台服务器的网络地址或机器名
-	[username]	用户名,字符串,缺省值 sa
-	[password]	密码,字符串,缺省值 golden
-	[port]      端口号,整型,缺省值 6327
-	[cap]       连接池大小,最小1,最大50
-	[max_sec]   最大租借时间(秒)
+	[hostname]  字符串，输入，服务器的网络地址或机器名,默认值 127.0.0.1
+	[username]	用户名,字符串,缺省值 admin
+	[password]	密码,字符串,缺省值 admin123
+	[langtype]	语言类型,字符串,缺省值 zh-CN
+	[port]      端口号,整型,缺省值 9646
+	[size]      连接池大小,最小1,最大50
+	[timeout]   超时时间(毫秒),默认值 3000
+	[max_sec]   最大租借时间(秒),默认值 3600
 - 输出:[*ConnPool] 连接池指针
 	[error] 创建句柄连接池时候的错误信息
 - 备注:
@@ -190,7 +203,7 @@ func (p *ConnPool) close() {
 // interface{} : 服务器返回的数据
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func (p *ConnPool) Request(funcCode byte, msg interface{}) (interface{}, float64, error) {
+func (p *ConnPool) Request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
 	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
@@ -202,7 +215,80 @@ func (p *ConnPool) Request(funcCode byte, msg interface{}) (interface{}, float64
 		p.ConnChan <- handle //将连接句柄归还到连接池管道
 		<-p.WorkerChan       //工作队列减去1
 	}()
+	////////////////////////////////////////////////////////////////
 	return handle.request(funcCode, msg)
+}
+
+//获取所有的非系统KEYS
+//请求参数:
+// 无
+//反回参数：
+// interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) GetKeys() (map[string]time.Time, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////////////////////////////////////
+	var data []byte
+	msg, sec, err := handle.request(_FC_GetKeys, data)
+	if err != nil {
+		return nil, sec, err
+	} else {
+		//fmt.Printf("原始数据:%+v\n", msg.Data)
+		keysmp, _ := msg.Data.(map[string]interface{})
+		keys := make(map[string]time.Time)
+		for k, v := range keysmp {
+			if tstr, ok := v.(string); ok {
+				keys[k], _ = time.ParseInLocation("2006-01-02T15:04:05.000", tstr, time.Local)
+			}
+		}
+		return keys, sec, err
+	}
+}
+
+//获取所有的非系统KEYS
+//请求参数:
+// 无
+//反回参数：
+// interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) GetUsers() ([]string, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////////////////////////////////////
+	var data []byte
+	msg, sec, err := handle.request(_FC_GetUsers, data)
+	if err != nil {
+		return nil, sec, err
+	} else {
+		//fmt.Printf("原始数据:%+v\n", msg.Data)
+		var users []string
+		usermp, _ := msg.Data.([]interface{})
+		for _, v := range usermp {
+			users = append(users, v.(string))
+		}
+		return users, sec, err
+	}
 }
 
 //读取标签
@@ -224,10 +310,21 @@ func (p *ConnPool) Read(tags ...string) (interface{}, float64, error) {
 		p.ConnChan <- handle //将连接句柄归还到连接池管道
 		<-p.WorkerChan       //工作队列减去1
 	}()
+	////////////////////////////////////////////////////////////////
 	if len(tags) == 1 {
-		return handle.request(_FC_ReadSingleKey, tags[0])
+		msg, sec, err := handle.request(_FC_ReadSingleKey, tags[0])
+		if err != nil {
+			return nil, sec, err
+		} else {
+			return msg.Data, sec, err
+		}
 	} else {
-		return handle.request(_FC_ReadMultiKey, tags)
+		msg, sec, err := handle.request(_FC_ReadMultiKey, tags)
+		if err != nil {
+			return nil, sec, err
+		} else {
+			return msg.Data, sec, err
+		}
 	}
 }
 
@@ -235,10 +332,10 @@ func (p *ConnPool) Read(tags ...string) (interface{}, float64, error) {
 //请求参数:
 // kvs map[string]interface{} : 需要写入的数据
 //反回参数：
-// bool: 写入的结果
+// interface{}: 返回的数据
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func (p *ConnPool) Write(kvs map[string]interface{}) (bool, float64, error) {
+func (p *ConnPool) Write(kvs map[string]interface{}) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
 	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
@@ -250,9 +347,13 @@ func (p *ConnPool) Write(kvs map[string]interface{}) (bool, float64, error) {
 		p.ConnChan <- handle //将连接句柄归还到连接池管道
 		<-p.WorkerChan       //工作队列减去1
 	}()
+	////////////////////////////////////////////////////////////////
 	msg, sec, err := handle.request(_FC_WriteMultiKey, kvs)
-	state, _ := msg.(bool)
-	return state, sec, err
+	if err != nil {
+		return nil, sec, err
+	} else {
+		return msg.Data, sec, err
+	}
 }
 
 //删除标签
@@ -274,14 +375,17 @@ func (p *ConnPool) Delete(tags ...string) (bool, float64, error) {
 		p.ConnChan <- handle //将连接句柄归还到连接池管道
 		<-p.WorkerChan       //工作队列减去1
 	}()
-	msg, sec, err := handle.request(_FC_DeleteMultiKey, tags)
-	state, _ := msg.(bool)
-	return state, sec, err
+	////////////////////////////////////////////////////////////////
+	_, sec, err := handle.request(_FC_DeleteMultiKey, tags)
+	if err != nil {
+		return false, sec, err
+	} else {
+		return true, sec, err
+	}
 }
 
 //服务器时间
-//请求参数:
-// tags ...string : 标签名
+//请求参数:无
 //反回参数：
 // time.Time : 时间
 // float64 : 执行耗时,单位秒
@@ -298,9 +402,200 @@ func (p *ConnPool) ServerTime() (time.Time, float64, error) {
 		p.ConnChan <- handle //将连接句柄归还到连接池管道
 		<-p.WorkerChan       //工作队列减去1
 	}()
+	////////////////////////////////
 	var data []byte
 	msg, sec, err := handle.request(_FC_Ping, data)
-	microSec, _ := msg.(int64)
-	t := time.Unix(microSec/1e6, microSec%1e6*1e3)
-	return t, sec, err
+
+	if err != nil {
+		return time.Now(), sec, err
+	} else {
+		microSec, _ := msg.Data.(int64)
+		t := time.Unix(microSec/1e6, microSec%1e6*1e3)
+		return t, sec, err
+	}
+}
+
+//标签自增
+//请求参数:
+// tag string : 标签名
+//反回参数：
+// int64 : 当前值
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) SelfIncrease(tag string) (int64, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////
+	msg, sec, err := handle.request(_FC_SelfIncrease, tag)
+	if err != nil {
+		return 0, sec, err
+	} else {
+		val, ok := msg.Data.(int64)
+		if !ok {
+			fval, ok := msg.Data.(float64)
+			if !ok {
+				return 0, sec, fmt.Errorf(i18n("data_type_fail_add"), reflect.TypeOf(msg.Data))
+			}
+			val = int64(fval)
+		}
+		return val, sec, err
+	}
+}
+
+//标签自减
+//请求参数:
+// tag string : 标签名
+//反回参数：
+// int64 : 当前值
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) SelfDecrease(tag string) (int64, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////
+	msg, sec, err := handle.request(_FC_SelfDecrease, tag)
+	if err != nil {
+		return 0, sec, err
+	} else {
+		val, ok := msg.Data.(int64)
+		if !ok {
+			fval, ok := msg.Data.(float64)
+			if !ok {
+				return 0, sec, fmt.Errorf(i18n("data_type_fail_add"), reflect.TypeOf(msg.Data))
+			}
+			val = int64(fval)
+		}
+		return val, sec, err
+	}
+}
+
+//压入管道
+//请求参数:
+// key string 标签名
+// value interface{} 数值
+//反回参数：
+// int64: 当前管道长度
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) PipePush(key string, value interface{}) (int64, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////////////////////////////////////
+	msg, sec, err := handle.request(_FC_PipePush, map[string]interface{}{key: value})
+	if err != nil {
+		return 0, sec, err
+	} else {
+		val, ok := msg.Data.(int64)
+		if !ok {
+			fval, ok := msg.Data.(float64)
+			if !ok {
+				return 0, sec, fmt.Errorf(i18n("data_assert_fail"), reflect.TypeOf(msg.Data))
+			}
+			val = int64(fval)
+		}
+		return val, sec, err
+	}
+}
+
+//获取管道当前的长度
+//请求参数:
+// tag string : 标签名
+//反回参数：
+// int64 : 当前管道长度
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) PipeLength(tag string) (int64, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////
+	msg, sec, err := handle.request(_FC_PipeLenght, tag)
+	if err != nil {
+		return 0, sec, err
+	} else {
+		val, ok := msg.Data.(int64)
+		if !ok {
+			fval, ok := msg.Data.(float64)
+			if !ok {
+				return 0, sec, fmt.Errorf(i18n("data_assert_fail"), reflect.TypeOf(msg.Data))
+			}
+			val = int64(fval)
+		}
+		return val, sec, err
+	}
+}
+
+//从管道中拉取数据
+//请求参数:
+// tag string : 标签名
+// ptype string : 拉取方式, "FIFO"、"LILO"或"FILO"、"LIFO"(不区分大小写)
+//反回参数:
+// int64 : 剩余长度
+// interface{} : 获取到的数据
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) PipePull(tag, ptype string) (int64, interface{}, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////
+	var fc byte
+	switch strings.ToLower(ptype) {
+	case "fifo", "lilo":
+		fc = _FC_PipeFiFoPull
+	case "filo", "lifo":
+		fc = _FC_PipeFiLoPull
+	default:
+		return 0, 0, 0., fmt.Errorf(i18n("log_pipe_pull_type_err"), ptype)
+	}
+	msg, sec, err := handle.request(fc, tag)
+	if err != nil {
+		return 0, 0, sec, err
+	} else {
+		length, _ := strconv.ParseInt(msg.Msg, 10, 64)
+		return length, msg.Data, sec, err
+	}
 }

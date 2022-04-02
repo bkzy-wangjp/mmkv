@@ -65,9 +65,12 @@ func (h *ConnHandel) dial(addr string) error {
 func (h *ConnHandel) ping() (float64, error) {
 	var data []byte
 	st := time.Now()
-	_, err := h.write(_FC_Ping, data)
+	msg, err := h.write(_FC_Ping, data)
 	if err != nil {
 		return 0, err
+	}
+	if !msg.Ok {
+		return 0, fmt.Errorf("%s", msg.Data)
 	}
 	return time.Since(st).Seconds(), nil
 }
@@ -82,12 +85,20 @@ func (h *ConnHandel) login(username, password string) error {
 	if err != nil {
 		return fmt.Errorf(i18n("log_err_user_marshal"), err.Error())
 	}
-	_, err = h.write(_FC_Login, msgdata)
-	return err
+	msg, err := h.write(_FC_Login, msgdata)
+	if err != nil {
+		return err
+	}
+	if !msg.Ok {
+		return fmt.Errorf("%s", msg.Data)
+	}
+	h.Logged = true
+	h.LoginAt = time.Now()
+	return nil
 }
 
 //写请求数据并返回响应信息
-func (h *ConnHandel) write(fc byte, data []byte) (interface{}, error) {
+func (h *ConnHandel) write(fc byte, data []byte) (*RespMsg, error) {
 	h.lastFc = fc
 	h.lastRev += 1
 	reqmsg := encodeRequest(h.lastFc, h.lastRev, data)
@@ -100,7 +111,8 @@ func (h *ConnHandel) write(fc byte, data []byte) (interface{}, error) {
 	}
 	h.TxBytes += int64(n) //发送字节数统计
 	h.TxTimes += 1        //发送次数统计
-	msg, err := h.read()
+
+	respmsg, err := h.read()
 	if err != nil && !h.retry { //检查到错误有一次重发的机会
 		h.retry = true
 		return h.write(fc, data)
@@ -108,11 +120,12 @@ func (h *ConnHandel) write(fc byte, data []byte) (interface{}, error) {
 	if h.retry {
 		h.retry = false
 	}
-	return msg, err
+	return respmsg, err
 }
 
 //读取数据,返回的接口是反馈信息的data部分或者ok部分
-func (h *ConnHandel) read() (interface{}, error) {
+//返回接收到的 RespMsg 和错误信息
+func (h *ConnHandel) read() (*RespMsg, error) {
 	var buf []byte
 	var crccheckok bool
 	isend := false //是否读取结束
@@ -150,7 +163,8 @@ func (h *ConnHandel) read() (interface{}, error) {
 }
 
 //处理接收到的数据
-func (h *ConnHandel) processData(buf []byte, crcchecked bool) (interface{}, error) {
+//返回接收到的 RespMsg 和错误信息
+func (h *ConnHandel) processData(buf []byte, crcchecked bool) (*RespMsg, error) {
 	rn := len(buf)
 	h.RxBytes += int64(rn) //接收字节数统计
 	h.RxTimes += 1         //接收次数统计
@@ -174,15 +188,13 @@ func (h *ConnHandel) processData(buf []byte, crcchecked bool) (interface{}, erro
 		return nil, err
 	}
 	//logs.Debug("功能码:%X,保留字节:%X,数据内容:%s", fc, rev, string(data))
-	return h.decodeData(data) //执行功能码,返回数据
+	return decodeResponse(data) //执行功能码,返回数据
 }
 
 //解析接收到的数据
-func (h *ConnHandel) decodeData(data []byte) (msgdata interface{}, err error) {
+/*
+func (h *ConnHandel) decodeData(data []byte) (str_msg string, ifc_data interface{}, err error) {
 	funcCode := h.lastFc
-	if funcCode >= 48 { //ASCII码模式
-		funcCode -= 48
-	}
 	respmsg, er := decodeResponse(data) //解析反馈数据
 	if er != nil {
 		err = er
@@ -201,27 +213,27 @@ func (h *ConnHandel) decodeData(data []byte) (msgdata interface{}, err error) {
 
 	switch funcCode {
 	case _FC_ReadSingleKey:
-		msgdata = msg.Data
+		ifc_data = msg.Data
 	case _FC_ReadMultiKey:
-		msgdata = msgs
+		ifc_data = msgs
 	case _FC_WriteSingleKey, _FC_WriteMultiKey:
-		msgdata = true
+		ifc_data = true
 	case _FC_DeleteSingleKey:
-		msgdata = true
+		ifc_data = true
 	case _FC_DeleteMultiKey:
-		msgdata = true
+		ifc_data = true
 	case _FC_Login:
-		msgdata = true
+		ifc_data = true
 		h.Logged = true
 		h.LoginAt = time.Now()
 	case _FC_Ping:
-		msgdata = msg.Data
+		ifc_data = msg.Data
 	default:
-		msgdata = msg.Data
+		ifc_data = msg.Data
 	}
 	return
 }
-
+*/
 //分割已经校验通过的数据
 func splitData(hex_data []byte) (funcCode byte, reserve byte, data []byte, err error) {
 	if len(hex_data) < 2 {
@@ -243,30 +255,32 @@ func encodeRequest(funcCode, reverse byte, data []byte) []byte {
 }
 
 //解码信息反馈报文
-func decodeResponse(hex_data []byte) (msgdata interface{}, err error) {
-	var msg RespMsg
-	err = json.Unmarshal(hex_data, &msg)
-	if err != nil {
-		var msgs []RespMsg
-		err = json.Unmarshal(hex_data, &msgs)
-		if err == nil {
-			msgdata = msgs
+func decodeResponse(hex_data []byte) (*RespMsg, error) {
+	msg := new(RespMsg)
+	err := json.Unmarshal(hex_data, msg)
+	/*
+		if err != nil {
+			var msgs []RespMsg
+			err = json.Unmarshal(hex_data, &msgs)
+			if err == nil {
+				msgdata = msgs
+			}
+		} else {
+			msgdata = msg
 		}
-	} else {
-		msgdata = msg
-	}
-	return
+	*/
+	return msg, err
 }
 
-//自有请求接口
+//自由请求接口
 //请求参数:
 // funcCode byte : 功能码
 // msg interface{} : 符合json结构和功能码要求的信息
 //反回参数：
-// interface{} : 服务器返回的数据
+// *RespMsg : 服务器返回的数据
 // float64 : 执行耗时,单位秒
-// error : 错误信息
-func (h *ConnHandel) request(funcCode byte, msg interface{}) (interface{}, float64, error) {
+// error : 错误信息(已经判断是否ok)
+func (h *ConnHandel) request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 	st := time.Now()
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -275,6 +289,9 @@ func (h *ConnHandel) request(funcCode byte, msg interface{}) (interface{}, float
 	resp, err := h.write(funcCode, data)
 	if err != nil {
 		return nil, time.Since(st).Seconds(), err
+	}
+	if !resp.Ok {
+		return nil, time.Since(st).Seconds(), fmt.Errorf("%s", resp.Data)
 	}
 	return resp, time.Since(st).Seconds(), nil
 }

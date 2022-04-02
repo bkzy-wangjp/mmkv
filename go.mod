@@ -1,4 +1,4 @@
-module github.com/bkzy-wangjp/mmdb
+module github.com/bkzy-wangjp/mmkv
 
 go 1.17
 

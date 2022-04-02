@@ -22,6 +22,9 @@ var (
 		"log_err_user_marshal": {
 			"en-US": "Error converting user login information to hexadecimal",
 			"zh-CN": "用户登录信息转换为16进制时出错"},
+		"log_pipe_pull_type_err": {
+			"en-US": "The configured pull type is wrong when pulling data from the pipeline. The type should be 'FIFO' or 'FILO', and the configured is:%s",
+			"zh-CN": "从管道中拉取数据时配置的拉取类型错误,类型应为'FIFO'或者'FILO',配置的为:%s"},
 		//来自主程序的定义
 		//用于通讯的错误信息
 		"user_unlogin": {
@@ -39,6 +42,12 @@ var (
 		"comm_less_4byte": {
 			"en-US": "The length of communication message shall be at least 4 bytes",
 			"zh-CN": "通讯报文长度至少4字节"},
+		"data_type_fail_add": {
+			"en-US": "The data type is incorrect. Addition and subtraction operations cannot be performed. The type is:%v",
+			"zh-CN": "数据类型不正确,不可执行加减运算. 数据类型是:%v"},
+		"data_assert_fail": {
+			"en-US": "Data type assertion failed, actual type is:%v",
+			"zh-CN": "数据类型断言失败,实际类型为:%v"},
 		//用于日志的信息
 		//错误日志
 		"log_err_listen_faile": {

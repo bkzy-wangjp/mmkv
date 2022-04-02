@@ -1,7 +1,8 @@
-package mmdb
+package mmkv
 
 import (
 	"encoding/hex"
+	"reflect"
 	"testing"
 )
 
@@ -94,6 +95,39 @@ func TestDecodeMap(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestReflect(t *testing.T) {
+	tests := []interface{}{
+		123,
+		123.456,
+		true,
+		[]int{123, 25, 32, 34, 45},
+		"abcd",
+	}
+	for _, v := range tests {
+		t.Log(reflect.TypeOf(v))
+		val, ok := v.(float64)
+		t.Log(val, ok)
+	}
+}
+
+func TestSelfAdd(t *testing.T) {
+	tests := []interface{}{
+		123,
+		123.456,
+		true,
+		[]int{123, 25, 32, 34, 45},
+		"abcd",
+	}
+	for _, v := range tests {
+		rel, err := selfAdd(v, 1)
+		if err != nil {
+			t.Error(err.Error())
+		} else {
+			t.Log(rel)
 		}
 	}
 }

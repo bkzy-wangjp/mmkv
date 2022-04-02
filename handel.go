@@ -1,4 +1,4 @@
-package mmdb
+package mmkv
 
 import (
 	"encoding/json"
@@ -96,9 +96,6 @@ func (h *ConnHandel) handleConn() {
 
 //处理接收到的数据
 func (h *ConnHandel) processData(buf []byte) error {
-	//hex_string := hex.EncodeToString(buf)
-	//byte_data, er := hex.DecodeString(string(hex_string))
-	//logs.Debug("hex_string:%s,byte_data:%s,错误信息:%v", hex_string, string(byte_data), er)
 	var respData interface{}
 	var resp RespMsg
 	rn := len(buf)
@@ -146,117 +143,227 @@ func (h *ConnHandel) processData(buf []byte) error {
 //执行功能码指定的功能
 func (h *ConnHandel) functionExec(funcCode byte, data []byte) interface{} {
 	var respData interface{}
-	if funcCode >= 48 { //ASCII码模式
-		funcCode -= 48
+
+	if funcCode == _FC_Ping { //连接测试
+		return MakeRespMsg(true, fmt.Sprintf("MmKv:%s", VERSION), time.Now().Local().UnixMicro())
 	}
 	if !h.Logged && funcCode != _FC_Login { //尚未登录且非登录指令
-		var resp RespMsg
-		resp.Ok = false
-		resp.Msg = "user_unlogin"
-		resp.Data = i18n(resp.Msg)
-		respData = resp
+		respData = MakeRespMsg(false, "user_unlogin", i18n("user_unlogin"))
 	} else { //已经登录或者有登录指令
 		switch funcCode {
-		case _FC_ReadSingleKey:
-			var resp RespMsg
-			if key, err := decodeKey(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-				resp.Data = ""
-			} else {
-				resp.Data, resp.Ok = MmDb.MmReadSingle(key)
-				if !resp.Ok {
-					resp.Data = ""
-				}
-				resp.Msg = key
-			}
-			respData = resp
-		case _FC_ReadMultiKey:
-			var resp RespMsg
-			if keys, err := decodeKeys(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-				resp.Data = ""
-				respData = resp
-			} else {
-				respData = MmDb.MmReadMulti(keys)
-			}
-		case _FC_WriteSingleKey, _FC_WriteMultiKey:
-			var resp RespMsg
-			if kvs, err := decodeMap(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-				resp.Data = ""
-			} else {
-				MmDb.MmWriteMulti(kvs)
-				resp.Ok = true
-				if funcCode == _FC_WriteSingleKey {
-					resp.Msg = "WriteSingleKey"
-				} else {
-					resp.Msg = "WriteMultiKey"
-				}
-				resp.Data = len(kvs)
-			}
-			respData = resp
-		case _FC_DeleteSingleKey:
-			var resp RespMsg
-			if key, err := decodeKey(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-			} else {
-				MmDb.MmDeleteSingle(key)
-				resp.Ok = true
-				resp.Msg = "DeleteSingleKey"
-				resp.Data = 1
-			}
-			respData = resp
-		case _FC_DeleteMultiKey:
-			var resp RespMsg
-			if keys, err := decodeKeys(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-			} else {
-				MmDb.MmDeleteMulti(keys)
-				resp.Ok = true
-				resp.Msg = "DeleteMultiKey"
-				resp.Data = len(keys)
-			}
-			respData = resp
-		case _FC_Login:
-			var resp RespMsg
-			if user, err := decodeUserMsg(data); err != nil {
-				resp.Ok = false
-				resp.Msg = err.Error()
-				resp.Data = ""
-			} else {
-				if ok, err := MmDb.MmCheckUser(user.Username, user.Password); ok {
-					resp.Ok = true
-					resp.Msg = VERSION
-					resp.Data = user.Username
-					h.Logged = true
-					h.LogAt = time.Now()
-					h.User = user.Username
-					logs.Info(i18n("log_info_user_login"), user.Username, h.Conn.RemoteAddr())
-				} else {
-					resp.Ok = false
-					resp.Msg = err.Error()
-					resp.Data = i18n(resp.Msg)
-				}
-			}
-			respData = resp
-		case _FC_Ping:
-			var resp RespMsg
-			resp.Ok = true
-			resp.Msg = "Ping connection"
-			resp.Data = fmt.Sprint(time.Now().Local().UnixMicro())
-			respData = resp
-		default:
-			var resp RespMsg
-			resp.Ok = false
-			resp.Msg = "fcode_undefined"
-			resp.Data = fmt.Sprintf(i18n(resp.Msg), funcCode)
-			respData = resp
+		case _FC_ReadSingleKey: //读单个标签
+			respData = h.ReadSingle(data)
+		case _FC_ReadMultiKey: //读多个标签
+			respData = h.ReadMulti(data)
+		case _FC_WriteSingleKey, _FC_WriteMultiKey: //写单个或者写多个标签
+			respData = h.Write(funcCode, data)
+		case _FC_DeleteSingleKey: //删除单个标签
+			respData = h.DeleteSingle(data)
+		case _FC_DeleteMultiKey: //删除多个标签
+			respData = h.DeleteMulti(data)
+		case _FC_Login: //登录
+			respData = h.Login(data)
+		case _FC_SelfIncrease: //标签自增
+			respData = h.SelfIncrease(data, 1)
+		case _FC_SelfDecrease: //标签自减
+			respData = h.SelfIncrease(data, -1)
+		case _FC_PipePush: //压入管道
+			respData = h.PipePush(data)
+		case _FC_PipeFiFoPull, _FC_PipeFiLoPull: //从管道拉取数据
+			respData = h.PipePull(funcCode, data)
+		case _FC_PipeLenght: //获取管道长度
+			respData = h.PipeLength(data)
+		case _FC_GetKeys: //获取已经存在的所有键
+			respData = h.GetKeys()
+		case _FC_GetUsers: //获取已经存在的所有用户名
+			respData = h.GetUsers()
+		default: //未定义的功能码
+			respData = MakeRespMsg(false, "fcode_undefined", fmt.Sprintf(i18n("fcode_undefined"), funcCode))
 		}
 	}
 	return respData
+}
+
+//读取单个标签的值
+func (h *ConnHandel) ReadSingle(data []byte) RespMsg {
+	var resp RespMsg
+	if key, err := decodeKey(data); err != nil {
+		resp = MakeRespMsg(false, "ReadSingle.decodeKey", err.Error())
+	} else {
+		resp.Data, resp.Ok = Db.MmReadSingle(key)
+		if !resp.Ok {
+			resp.Data = fmt.Sprintf(i18n("undefined_key"), key)
+		}
+		resp.Msg = key
+	}
+	return resp
+}
+
+//读取多个标签的值
+func (h *ConnHandel) ReadMulti(data []byte) RespMsg {
+	if keys, err := decodeKeys(data); err != nil {
+		return MakeRespMsg(false, "ReadMulti.decodeKeys", err.Error())
+	} else {
+		return MakeRespMsg(true, fmt.Sprintf("%d", len(keys)), Db.MmReadMulti(keys))
+	}
+}
+
+//写标签的值
+func (h *ConnHandel) Write(fc byte, data []byte) RespMsg {
+	if kvs, err := decodeMap(data); err != nil {
+		return MakeRespMsg(false, err.Error(), "")
+	} else {
+		data := Db.MmWriteMulti(kvs)
+		if fc == _FC_WriteSingleKey { //写单个标签
+			if len(data) > 0 { //有反馈数据
+				return data[0]
+			} else { //没有反馈数据
+				return MakeRespMsg(false, "write_no_tag", i18n("write_no_tag"))
+			}
+		}
+		if len(data) > 0 { //有反馈数据
+			return MakeRespMsg(true, fmt.Sprintf("%d", len(data)), data)
+		} else { //没有反馈数据
+			return MakeRespMsg(false, "write_no_tag", i18n("write_no_tag"))
+		}
+	}
+}
+
+//删除单个标签的值
+func (h *ConnHandel) DeleteSingle(data []byte) RespMsg {
+	var resp RespMsg
+	if key, err := decodeKey(data); err != nil {
+		resp.Ok = false
+		resp.Msg = "DeleteSingle.decodeKey"
+		resp.Data = err.Error()
+	} else {
+		dels := Db.MmDeleteSingle(key)
+		resp.Ok = true
+		resp.Msg = "DeleteSingleKey"
+		resp.Data = dels
+	}
+	return resp
+}
+
+//删除多个标签的值
+func (h *ConnHandel) DeleteMulti(data []byte) RespMsg {
+	var resp RespMsg
+	if keys, err := decodeKeys(data); err != nil {
+		resp.Ok = false
+		resp.Msg = "DeleteMulti.decodeKeys"
+		resp.Data = err.Error()
+	} else {
+		dels := Db.MmDeleteMulti(keys)
+		resp.Ok = true
+		resp.Msg = "DeleteMultiKey"
+		resp.Data = dels
+	}
+	return resp
+}
+
+//删除多个标签的值
+func (h *ConnHandel) Login(data []byte) RespMsg {
+	var resp RespMsg
+	if user, err := decodeUserMsg(data); err != nil {
+		resp.Ok = false
+		resp.Msg = "Login.decodeUserMsg"
+		resp.Data = err.Error()
+	} else {
+		if ok, err := Db.MmCheckUser(user.Username, user.Password); ok {
+			resp.Ok = true
+			resp.Msg = VERSION
+			resp.Data = user.Username
+			h.Logged = true
+			h.LogAt = time.Now()
+			h.User = user.Username
+			logs.Info(i18n("log_info_user_login"), user.Username, h.Conn.RemoteAddr())
+		} else {
+			resp.Ok = false
+			resp.Msg = err.Error()
+			resp.Data = i18n(resp.Msg)
+		}
+	}
+	return resp
+}
+
+//标签自增
+func (h *ConnHandel) SelfIncrease(data []byte, value int64) RespMsg {
+	if key, err := decodeKey(data); err != nil {
+		return MakeRespMsg(false, "SelfIncrease.decodeKey", err.Error())
+	} else {
+		newv, err := Db.MmSelfIncrease(key, value)
+		if err != nil {
+			return MakeRespMsg(false, "", err.Error())
+		} else {
+			return MakeRespMsg(true, key, newv)
+		}
+	}
+}
+
+//压入管道
+func (h *ConnHandel) PipePush(data []byte) RespMsg {
+	if kvs, err := decodeMap(data); err != nil {
+		return MakeRespMsg(false, "PipePush.decodeMap", err.Error())
+	} else {
+		var n int = 0
+		var err error
+		var key string
+		for k, v := range kvs {
+			key = k
+			n, err = Db.MmPipePush(k, v)
+		}
+		if err != nil { //有反馈数据
+			return MakeRespMsg(false, "pipe push fail", err.Error())
+		} else { //没有反馈数据
+			return MakeRespMsg(true, key, n)
+		}
+	}
+}
+
+//从管道拉取数据
+func (h *ConnHandel) PipePull(fc byte, data []byte) RespMsg {
+	var resp RespMsg
+	if key, err := decodeKey(data); err != nil {
+		resp = MakeRespMsg(false, "PipePull.decodeKey", err.Error())
+	} else {
+		l, data, err := Db.MmPipePull(fc, key)
+		if err != nil {
+			resp = MakeRespMsg(false, fmt.Sprintf("%d", l), err.Error()) //无数据的时候长度为-1,其他错误时长度为0
+		} else {
+			resp = MakeRespMsg(true, fmt.Sprintf("%d", l), data)
+		}
+	}
+	return resp
+}
+
+//获取管道长度
+func (h *ConnHandel) PipeLength(data []byte) RespMsg {
+	var resp RespMsg
+	if key, err := decodeKey(data); err != nil {
+		resp = MakeRespMsg(false, "PipeLength.decodeKey", err.Error())
+	} else {
+		l, err := Db.MmPipeLength(key)
+		if err != nil {
+			resp = MakeRespMsg(false, "get pipe length fail", err.Error()) //无数据的时候长度为-1,其他错误时长度为0
+		} else {
+			resp = MakeRespMsg(true, key, l)
+		}
+	}
+	return resp
+}
+
+//获取现存的非系统keys
+func (h *ConnHandel) GetKeys() RespMsg {
+	var resp RespMsg
+	resp.Data = Db.MmGetKeysDict()
+	resp.Ok = true
+	return resp
+}
+
+//获取现存的系统users
+func (h *ConnHandel) GetUsers() RespMsg {
+	var resp RespMsg
+	resp.Data = Db.MmGetUsersDict()
+	resp.Ok = true
+	return resp
 }
