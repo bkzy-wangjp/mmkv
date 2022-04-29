@@ -120,7 +120,7 @@ func (h *ConnHandel) processData(buf []byte) error {
 			if err != nil {
 				logs.Error(i18n("log_err_splite_data"), err.Error())
 			}
-			logs.Debug("功能码:%X,保留字节:%X,数据内容:%s", fc, hex_data[1], string(data))
+			//logs.Debug("功能码:%X,保留字节:%X,数据内容:%s", fc, hex_data[1], string(data))
 			respData = h.functionExec(fc, data) //执行功能码,返回数据
 		}
 	}
@@ -180,6 +180,13 @@ func (h *ConnHandel) functionExec(funcCode byte, data []byte) interface{} {
 		default: //未定义的功能码
 			respData = MakeRespMsg(false, "fcode_undefined", fmt.Sprintf(i18n("fcode_undefined"), funcCode))
 		}
+	}
+	if funcCode > 1 {
+		fcmsg, ok := _FC_MAP[funcCode]
+		if !ok {
+			fcmsg = fmt.Sprintf("Undefined Function Code:%X", funcCode)
+		}
+		logs.Debug("%s -> %s : %s", h.Conn.RemoteAddr(), fcmsg, string(data))
 	}
 	return respData
 }

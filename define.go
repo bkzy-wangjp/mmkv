@@ -35,6 +35,25 @@ const (
 var (
 	Db       MemoryKeyValueMap //内存数据库
 	ConnPool []*ConnHandel     //连接池
+
+	_FC_MAP = map[byte]string{
+		0x01: "Ping",
+		0x02: "Login",
+		0x03: "WriteSingleKey",
+		0x04: "WriteMultiKey",
+		0x05: "ReadSingleKey",
+		0x06: "ReadMultiKey",
+		0x07: "DeleteSingleKey",
+		0x08: "DeleteMultiKey",
+		0x09: "SelfIncrease",
+		0x0A: "SelfDecrease",
+		0x0B: "PipePush",
+		0x0C: "PipeFiFoPull",
+		0x0D: "PipeFiLoPull",
+		0x0E: "PipeLenght",
+		0x10: "GetKeys",
+		0x11: "GetUsers",
+	}
 )
 
 //响应数据的结构

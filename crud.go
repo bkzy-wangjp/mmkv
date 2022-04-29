@@ -61,11 +61,11 @@ func (db *MemoryKeyValueMap) MmCheckUser(username, password string) (bool, error
 				if user.Password == password {
 					return true, nil
 				} else { //密码不匹配
-					logs.Debug(i18n("log_debug_user_pswd_err"), username)
+					logs.Info(i18n("log_debug_user_pswd_err"), username)
 					return false, fmt.Errorf(i18n("user_passsword_error"))
 				}
 			} else { //用户名不存在
-				logs.Debug(i18n("user_noname"), username)
+				logs.Info(i18n("user_noname"), username)
 				return false, fmt.Errorf(i18n("user_noname"), username)
 			}
 		}
@@ -77,13 +77,13 @@ func (db *MemoryKeyValueMap) MmCheckUser(username, password string) (bool, error
 
 //读取单个标签
 func (db *MemoryKeyValueMap) MmReadSingle(key string) (val interface{}, ok bool) {
-	logs.Debug(i18n("log_debug_read_single"), key)
+	//logs.Debug(i18n("log_debug_read_single"), key)
 	return db.Load(key)
 }
 
 //读取多个标签
 func (db *MemoryKeyValueMap) MmReadMulti(keys []string) (datas []RespMsg) {
-	logs.Debug(i18n("log_debug_read_multi"), keys)
+	//logs.Debug(i18n("log_debug_read_multi"), keys)
 	for _, k := range keys {
 		var msg RespMsg
 		msg.Msg = k
@@ -155,7 +155,7 @@ func (db *MemoryKeyValueMap) deleteFromKeysDict(keys ...string) {
 
 //写单个标签
 func (db *MemoryKeyValueMap) MmWriteSingle(key string, value interface{}) (interface{}, error) {
-	logs.Debug(i18n("log_debug_write_single"), key, value)
+	//logs.Debug(i18n("log_debug_write_single"), key, value)
 	if isSysReservedKey(key) { //检查是否关键字
 		return value, fmt.Errorf(i18n("sys_reserved_key"), key)
 	}
@@ -197,7 +197,7 @@ func (db *MemoryKeyValueMap) MmWriteMulti(maps map[string]interface{}) []RespMsg
 //如果删除成功(标签存在),返回1
 //如果标签不存在,返回0
 func (db *MemoryKeyValueMap) MmDeleteSingle(key string) int64 {
-	logs.Debug(i18n("log_debug_delete_single"), key)
+	//logs.Debug(i18n("log_debug_delete_single"), key)
 	_, ok := db.Load(key)
 	db.Delete(key)
 	//删除keys字典中的记录
@@ -212,7 +212,7 @@ func (db *MemoryKeyValueMap) MmDeleteSingle(key string) int64 {
 //删除多个标签
 //返回删除成功的标签数
 func (db *MemoryKeyValueMap) MmDeleteMulti(keys []string) int64 {
-	logs.Debug(i18n("log_debug_delete_multi"), keys)
+	//logs.Debug(i18n("log_debug_delete_multi"), keys)
 	var deleted int64 = 0
 	for _, k := range keys {
 		_, ok := db.Load(k)
@@ -244,7 +244,7 @@ func (db *MemoryKeyValueMap) MmSelfIncrease(key string, value int64) (interface{
 		return value, fmt.Errorf(i18n("sys_reserved_key"), key)
 	}
 
-	logs.Debug(i18n("log_debug_self_increase"), key)
+	//logs.Debug(i18n("log_debug_self_increase"), key)
 	oldv, ok := db.Load(key) //加载标签
 	if ok {                  //标签存在
 		newv, err := selfAdd(oldv, value) //值自加
@@ -269,7 +269,7 @@ func (db *MemoryKeyValueMap) MmPipePush(key string, value interface{}) (int, err
 		return 0, fmt.Errorf(i18n("sys_reserved_key"), key)
 	}
 
-	logs.Debug(i18n("log_debug_pipe_push"), key, value)
+	//logs.Debug(i18n("log_debug_pipe_push"), key, value)
 	oldv, ok := db.Load(key) //加载标签
 	if ok {                  //标签存在
 		oldtype := reflect.TypeOf(oldv)
@@ -309,7 +309,7 @@ func (db *MemoryKeyValueMap) MmPipePull(fc byte, key string) (int, interface{}, 
 		return 0, 0, fmt.Errorf(i18n("sys_reserved_key"), key)
 	}
 
-	logs.Debug(i18n("log_debug_pipe_pull"), key)
+	//logs.Debug(i18n("log_debug_pipe_pull"), key)
 	oldv, ok := db.Load(key) //加载标签
 	if ok {                  //标签存在
 		oldtype := reflect.TypeOf(oldv)
@@ -343,7 +343,7 @@ func (db *MemoryKeyValueMap) MmPipePull(fc byte, key string) (int, interface{}, 
 //获取管道长度
 //返回管道剩余长度和错误信息
 func (db *MemoryKeyValueMap) MmPipeLength(key string) (int, error) {
-	logs.Debug(i18n("log_debug_pipe_len"), key)
+	//logs.Debug(i18n("log_debug_pipe_len"), key)
 	oldv, ok := db.Load(key) //加载标签
 	if ok {                  //标签存在
 		oldtype := reflect.TypeOf(oldv)

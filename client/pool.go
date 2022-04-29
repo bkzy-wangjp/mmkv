@@ -170,6 +170,11 @@ func (p *ConnPool) run() {
 	defer p.close()
 	for {
 		for _, c := range p.Conns { //遍历连接池
+			if c.ConnServer { //如果处于连接状态
+				if _, err := c.ping(); err != nil { //检查连接是否可用
+					c.ConnServer = false
+				}
+			}
 			if (c.Working && time.Since(c.WorkeAt).Seconds() >= float64(p.maxSec)) || !c.ConnServer { //租用超时或者失去与服务器的连接
 				c.Working = false //停止工作
 				c.Conn.Close()    //关闭接口
