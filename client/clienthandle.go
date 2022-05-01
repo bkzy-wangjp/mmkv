@@ -99,6 +99,12 @@ func (h *ConnHandel) login(username, password string) error {
 
 //写请求数据并返回响应信息
 func (h *ConnHandel) write(fc byte, data []byte) (*RespMsg, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			h.ConnServer = false
+		}
+	}()
+
 	h.lastFc = fc
 	h.lastRev += 1
 	reqmsg := encodeRequest(h.lastFc, h.lastRev, data)
@@ -126,6 +132,12 @@ func (h *ConnHandel) write(fc byte, data []byte) (*RespMsg, error) {
 //读取数据,返回的接口是反馈信息的data部分或者ok部分
 //返回接收到的 RespMsg 和错误信息
 func (h *ConnHandel) read() (*RespMsg, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			h.ConnServer = false
+		}
+	}()
+
 	var buf []byte
 	var crccheckok bool
 	isend := false //是否读取结束
@@ -289,6 +301,9 @@ func (h *ConnHandel) request(funcCode byte, msg interface{}) (*RespMsg, float64,
 	resp, err := h.write(funcCode, data)
 	if err != nil {
 		return nil, time.Since(st).Seconds(), err
+	}
+	if resp == nil {
+		return nil, time.Since(st).Seconds(), fmt.Errorf("response is null")
 	}
 	if !resp.Ok {
 		return nil, time.Since(st).Seconds(), fmt.Errorf("%s", resp.Data)

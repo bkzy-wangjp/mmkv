@@ -39,7 +39,7 @@ func (h *ConnHandel) handleConn() {
 			read_start <- true //开始读标记
 		}
 		if err != nil {
-			if err == io.EOF || strings.Contains(err.Error(), "close") { //客户端关闭
+			if err == io.EOF || strings.Contains(err.Error(), "close") || strings.Contains(err.Error(), "aborted") { //客户端关闭
 				logs.Info(i18n("log_info_client_shutdown"), h.Conn.RemoteAddr())
 				return
 			}
@@ -47,44 +47,44 @@ func (h *ConnHandel) handleConn() {
 			continue
 		}
 		if n == _ReedBufSize { //如果缓冲区满
-			if rbuf[n-1] == '\n' || rbuf[n-1] == '\r' { //有结束符
-				logs.Debug(i18n("log_debug_terminator_received")) //接收到结束符
-				isend = true                                      //设置结束标志
-				rbuf = rbuf[:n-1]                                 //删除掉结束符
-				n -= 1
-			} else { //数据区满，但没有接收到结束符
-				isend = false
-				go func(nc net.Conn, done chan bool) {
-					n := 10
-					cnt := make(chan int, n)
-					for i := 0; i < n; i++ {
-						cnt <- i
-					}
-					defer close(cnt)
-					for {
-						select {
-						case c := <-cnt:
-							time.Sleep(1 * time.Millisecond)
-							if c == 9 {
-								isend = true
-								h.processData(buf)
-								buf = buf[:0]
-								return
-							}
-						case <-done:
+			//if rbuf[n-1] == '\n' || rbuf[n-1] == '\r' { //有结束符
+			//	logs.Debug(i18n("log_debug_terminator_received")) //接收到结束符
+			//	isend = true                                      //设置结束标志
+			//	rbuf = rbuf[:n-1]                                 //删除掉结束符
+			//	n -= 1
+			//} else { //数据区满，但没有接收到结束符
+			isend = false
+			go func(nc net.Conn, done chan bool) {
+				n := 10
+				cnt := make(chan int, n)
+				for i := 0; i < n; i++ {
+					cnt <- i
+				}
+				defer close(cnt)
+				for {
+					select {
+					case c := <-cnt:
+						time.Sleep(1 * time.Millisecond)
+						if c == 9 {
+							isend = true
+							h.processData(buf)
+							buf = buf[:0]
 							return
 						}
+					case <-done:
+						return
 					}
-				}(h.Conn, read_start)
-			}
+				}
+			}(h.Conn, read_start)
+			//}
 			buf = append(buf, rbuf[:n]...) //保存临时缓冲区数据到全局缓冲区
 		} else { //缓冲区未满
-			isend = true                                //
-			if rbuf[n-1] == '\n' || rbuf[n-1] == '\r' { //有结束符
-				logs.Debug(i18n("log_debug_terminator_received")) //接收到结束符
-				rbuf = rbuf[:n-1]                                 //删除掉结束符
-				n -= 1
-			}
+			isend = true //
+			//if rbuf[n-1] == '\n' || rbuf[n-1] == '\r' { //有结束符
+			//	logs.Debug(i18n("log_debug_terminator_received")) //接收到结束符
+			//	rbuf = rbuf[:n-1]                                 //删除掉结束符
+			//	n -= 1
+			//}
 			buf = append(buf, rbuf[:n]...)
 		}
 		if isend { //接收数据结束

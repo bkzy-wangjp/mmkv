@@ -177,7 +177,9 @@ func (p *ConnPool) run() {
 			}
 			if (c.Working && time.Since(c.WorkeAt).Seconds() >= float64(p.maxSec)) || !c.ConnServer { //租用超时或者失去与服务器的连接
 				c.Working = false //停止工作
-				c.Conn.Close()    //关闭接口
+				if c.ConnServer {
+					c.Conn.Close() //关闭接口
+				}
 				c.dial(p.address) //重连接
 			}
 		}
@@ -192,6 +194,12 @@ func (p *ConnPool) run() {
 
 //关闭连接池
 func (p *ConnPool) close() {
+	defer func() {
+		if err := recover(); err != nil {
+			return
+		}
+	}()
+
 	for _, h := range p.Conns {
 		h.Conn.Close()
 	}
