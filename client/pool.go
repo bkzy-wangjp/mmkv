@@ -180,7 +180,9 @@ func (p *ConnPool) run() {
 				if c.ConnServer {
 					c.Conn.Close() //关闭接口
 				}
-				c.dial(p.address) //重连接
+				if err := c.dial(p.address); err == nil { //重连接
+					c.login(p.username, p.password)
+				}
 			}
 		}
 		time.Sleep(time.Second * 60)
@@ -239,7 +241,7 @@ func (p *ConnPool) Request(funcCode byte, msg interface{}) (*RespMsg, float64, e
 // interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func (p *ConnPool) GetKeys() (map[string]time.Time, float64, error) {
+func (p *ConnPool) GetKeys() ([]interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
 	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
@@ -258,14 +260,8 @@ func (p *ConnPool) GetKeys() (map[string]time.Time, float64, error) {
 		return nil, sec, err
 	} else {
 		//fmt.Printf("原始数据:%+v\n", msg.Data)
-		keysmp, _ := msg.Data.(map[string]interface{})
-		keys := make(map[string]time.Time)
-		for k, v := range keysmp {
-			if tstr, ok := v.(string); ok {
-				keys[k], _ = time.ParseInLocation("2006-01-02T15:04:05.000", tstr, time.Local)
-			}
-		}
-		return keys, sec, err
+		keysmp, _ := msg.Data.([]interface{})
+		return keysmp, sec, err
 	}
 }
 
@@ -348,7 +344,35 @@ func (p *ConnPool) Read(tags ...string) (interface{}, float64, error) {
 // interface{}: 返回的数据
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func (p *ConnPool) Write(kvs map[string]interface{}) (interface{}, float64, error) {
+func (p *ConnPool) Write(key string, val interface{}) (interface{}, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////////////////////////////////////
+	msg, sec, err := handle.request(_FC_WriteSingleKey, map[string]interface{}{key: val})
+	if err != nil {
+		return nil, sec, err
+	} else {
+		return msg.Data, sec, err
+	}
+}
+
+//写多个标签
+//请求参数:
+// kvs map[string]interface{} : 需要写入的数据
+//反回参数：
+// interface{}: 返回的数据
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) Writes(kvs map[string]interface{}) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
 	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
