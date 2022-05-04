@@ -110,8 +110,9 @@ func (db *MemoryKeyValueMap) MmGetUsersDict() []string {
 	return nil
 }
 
+/*
 //读取用户键字典
-func (db *MemoryKeyValueMap) MmGetKeysDict() map[string]string {
+func (db *MemoryKeyValueMap) MmGetKeysDictx() map[string]string {
 	if keysmp, ok := db.Load(_KeysDict); ok {
 		if dict, ok := keysmp.(map[string]time.Time); ok {
 			keys := make(map[string]string)
@@ -152,7 +153,7 @@ func (db *MemoryKeyValueMap) deleteFromKeysDict(keys ...string) {
 		db.Store(_KeysDict, make(map[string]time.Time))
 	}
 }
-
+*/
 //写单个标签
 func (db *MemoryKeyValueMap) MmWriteSingle(key string, value interface{}) (interface{}, error) {
 	//logs.Debug(i18n("log_debug_write_single"), key, value)
@@ -169,9 +170,9 @@ func (db *MemoryKeyValueMap) MmWriteSingle(key string, value interface{}) (inter
 				return oldv, fmt.Errorf(i18n("write_type_mismatch"), oldtype, newtype) //返回错误信息
 			}
 		}
-	} else {
-		db.addToKeysDict(key) //添加新键
-	}
+	} //else {
+	//	db.addToKeysDict(key) //添加新键
+	//}
 	db.Store(key, value)
 	return value, nil
 }
@@ -201,7 +202,7 @@ func (db *MemoryKeyValueMap) MmDeleteSingle(key string) int64 {
 	_, ok := db.Load(key)
 	db.Delete(key)
 	//删除keys字典中的记录
-	db.deleteFromKeysDict(key)
+	//db.deleteFromKeysDict(key)
 	if ok {
 		return 0
 	} else {
@@ -221,7 +222,7 @@ func (db *MemoryKeyValueMap) MmDeleteMulti(keys []string) int64 {
 		}
 		db.Delete(k)
 	}
-	db.deleteFromKeysDict(keys...)
+	//db.deleteFromKeysDict(keys...)
 	return deleted
 }
 
@@ -256,9 +257,9 @@ func (db *MemoryKeyValueMap) MmSelfIncrease(key string, value int64) (interface{
 		}
 	} else { //标签不存在
 		var init int64 = 1
-		db.Store(key, init)   //新建标签
-		db.addToKeysDict(key) //添加新键
-		return init, nil      //返回新值
+		db.Store(key, init) //新建标签
+		//db.addToKeysDict(key) //添加新键
+		return init, nil //返回新值
 	}
 }
 
@@ -297,7 +298,7 @@ func (db *MemoryKeyValueMap) MmPipePush(key string, value interface{}) (int, err
 		var vslice []interface{}
 		vslice = append(vslice, value)
 		db.Store(key, vslice)
-		db.addToKeysDict(key) //添加新键
+		//db.addToKeysDict(key) //添加新键
 		return len(vslice), nil
 	}
 }

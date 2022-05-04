@@ -203,49 +203,6 @@ func (h *ConnHandel) processData(buf []byte, crcchecked bool) (*RespMsg, error) 
 	return decodeResponse(data) //执行功能码,返回数据
 }
 
-//解析接收到的数据
-/*
-func (h *ConnHandel) decodeData(data []byte) (str_msg string, ifc_data interface{}, err error) {
-	funcCode := h.lastFc
-	respmsg, er := decodeResponse(data) //解析反馈数据
-	if er != nil {
-		err = er
-		return
-	}
-	var msgs []RespMsg
-	msg, ok := respmsg.(RespMsg) //按照单个信息方式解析
-	if !ok {
-		msgs, _ = respmsg.([]RespMsg)
-	} else {
-		if !msg.Ok {
-			err = fmt.Errorf("%s", msg.Data) //按照多个信息方式解析
-			return
-		}
-	}
-
-	switch funcCode {
-	case _FC_ReadSingleKey:
-		ifc_data = msg.Data
-	case _FC_ReadMultiKey:
-		ifc_data = msgs
-	case _FC_WriteSingleKey, _FC_WriteMultiKey:
-		ifc_data = true
-	case _FC_DeleteSingleKey:
-		ifc_data = true
-	case _FC_DeleteMultiKey:
-		ifc_data = true
-	case _FC_Login:
-		ifc_data = true
-		h.Logged = true
-		h.LoginAt = time.Now()
-	case _FC_Ping:
-		ifc_data = msg.Data
-	default:
-		ifc_data = msg.Data
-	}
-	return
-}
-*/
 //分割已经校验通过的数据
 func splitData(hex_data []byte) (funcCode byte, reserve byte, data []byte, err error) {
 	if len(hex_data) < 2 {

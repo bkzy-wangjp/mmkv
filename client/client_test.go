@@ -46,7 +46,7 @@ func TestWrite(t *testing.T) {
 		t.Error(err)
 	} else {
 		for i := 0; i < 10; i++ {
-			msg, sec, err := pool.Write(data)
+			msg, sec, err := pool.Writes(data)
 			if err != nil {
 				t.Error(err)
 			} else {

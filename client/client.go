@@ -43,7 +43,7 @@ func Request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 // interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func GetKeys() (map[string]time.Time, float64, error) {
+func GetKeys() ([]interface{}, float64, error) {
 	return _POOL.GetKeys()
 }
 
@@ -69,15 +69,26 @@ func Read(tags ...string) (interface{}, float64, error) {
 	return _POOL.Read(tags...)
 }
 
-//写标签
+//写单个标签
 //请求参数:
 // kvs map[string]interface{} : 需要写入的数据
 //反回参数：
 // interface{}: 返回的数据
 // float64 : 执行耗时,单位秒
 // error : 错误信息
-func Write(kvs map[string]interface{}) (interface{}, float64, error) {
-	return _POOL.Write(kvs)
+func Write(key string, value interface{}) (interface{}, float64, error) {
+	return _POOL.Write(key, value)
+}
+
+//写多个标签
+//请求参数:
+// kvs map[string]interface{} : 需要写入的数据
+//反回参数：
+// interface{}: 返回的数据
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func Writes(kvs map[string]interface{}) (interface{}, float64, error) {
+	return _POOL.Writes(kvs)
 }
 
 //删除标签

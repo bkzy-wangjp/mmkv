@@ -362,7 +362,15 @@ func (h *ConnHandel) PipeLength(data []byte) RespMsg {
 //获取现存的非系统keys
 func (h *ConnHandel) GetKeys() RespMsg {
 	var resp RespMsg
-	resp.Data = Db.MmGetKeysDict()
+	var keys []string
+	Db.Range(func(k, v interface{}) bool {
+		key, ok := k.(string)
+		if ok {
+			keys = append(keys, key)
+		}
+		return true
+	})
+	resp.Data = keys
 	resp.Ok = true
 	return resp
 }
