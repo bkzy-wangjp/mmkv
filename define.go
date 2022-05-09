@@ -27,16 +27,17 @@ const (
 	_FC_PipeFiFoPull    = 0x0C //先进先出拉取数据
 	_FC_PipeFiLoPull    = 0x0D //先进后出拉取数据
 	_FC_PipeLenght      = 0x0E //获取管道的长度
+	_FC_PipeAll         = 0x0F //一次性读取管道中的所有数据
 
 	_FC_GetKeys  = 0x10 //获取所有已经存在的键
 	_FC_GetUsers = 0x11 //获取所有已经存在的用户名
 )
 
 var (
-	Db         MemoryKeyValueMap //内存数据库
-	ConnPool   []*ConnHandel     //连接池
-	_USER_DICT sync.Map          //用户字典
-	_KEY_DICT  sync.Map          //标签字典
+	Db       MemoryKeyValueMap //内存数据库
+	ConnPool []*ConnHandel     //连接池
+	//_USER_DICT sync.Map          //用户字典
+	//_KEY_DICT  sync.Map          //标签字典
 
 	_FC_MAP = map[byte]string{
 		0x01: "Ping",
@@ -53,6 +54,7 @@ var (
 		0x0C: "PipeFiFoPull",
 		0x0D: "PipeFiLoPull",
 		0x0E: "PipeLenght",
+		0x0F: "PipeAll",
 		0x10: "GetKeys",
 		0x11: "GetUsers",
 	}

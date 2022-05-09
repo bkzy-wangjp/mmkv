@@ -28,6 +28,7 @@ const (
 	_FC_PipeFiFoPull    = 0x0C //先进先出拉取数据
 	_FC_PipeFiLoPull    = 0x0D //先进后出拉取数据
 	_FC_PipeLenght      = 0x0E //获取管道的长度
+	_FC_PipeAll         = 0x0F //一次性读取管道中的所有数据
 	_FC_GetKeys         = 0x10 //获取所有已经存在的键
 	_FC_GetUsers        = 0x11 //获取所有已经存在的用户名
 )
@@ -446,9 +447,15 @@ func (p *ConnPool) ServerTime() (time.Time, float64, error) {
 	if err != nil {
 		return time.Now(), sec, err
 	} else {
-		microSec, _ := msg.Data.(int64)
-		t := time.Unix(microSec/1e6, microSec%1e6*1e3)
-		return t, sec, err
+		//fmt.Printf("获取到的时间:%s\n", tstr)
+		fmicroSec, ok := msg.Data.(float64)
+		if ok {
+			microSec := int64(fmicroSec)
+			t := time.Unix(microSec/1e6, microSec%1e6*1e3)
+			return t, sec, err
+		} else {
+			return time.Now(), sec, err
+		}
 	}
 }
 
@@ -634,5 +641,33 @@ func (p *ConnPool) PipePull(tag, ptype string) (int64, interface{}, float64, err
 	} else {
 		length, _ := strconv.ParseInt(msg.Msg, 10, 64)
 		return length, msg.Data, sec, err
+	}
+}
+
+//从管道中拉取所有数据
+//请求参数:
+// tag string : 标签名
+//反回参数:
+// interface{} : 获取到的数据
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func (p *ConnPool) PipeAll(tag string) (interface{}, float64, error) {
+	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
+	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
+	handle := <-p.ConnChan //从连接池队列中取出一个连接用于工作
+	handle.Working = true
+	handle.WorkeAt = time.Now()
+	<-p.ReqChan //移除一个请求
+	defer func() {
+		handle.Working = false
+		p.ConnChan <- handle //将连接句柄归还到连接池管道
+		<-p.WorkerChan       //工作队列减去1
+	}()
+	////////////////////////////////
+	msg, sec, err := handle.request(_FC_PipeAll, tag)
+	if err != nil {
+		return nil, sec, err
+	} else {
+		return msg.Data, sec, err
 	}
 }

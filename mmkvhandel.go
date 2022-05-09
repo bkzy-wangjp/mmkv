@@ -143,6 +143,12 @@ func (h *ConnHandel) processData(buf []byte) error {
 //执行功能码指定的功能
 func (h *ConnHandel) functionExec(funcCode byte, data []byte) interface{} {
 	var respData interface{}
+	//过滤掉转义字符
+	data = []byte(strings.ReplaceAll(string(data), `\"`, `"`))
+	data = []byte(strings.ReplaceAll(string(data), `"{`, `{`))
+	data = []byte(strings.ReplaceAll(string(data), `}"`, `}`))
+	data = []byte(strings.ReplaceAll(string(data), `"[`, `[`))
+	data = []byte(strings.ReplaceAll(string(data), `]"`, `]`))
 
 	if funcCode == _FC_Ping { //连接测试
 		return MakeRespMsg(true, fmt.Sprintf("MmKv:%s", VERSION), time.Now().Local().UnixMicro())
@@ -173,6 +179,8 @@ func (h *ConnHandel) functionExec(funcCode byte, data []byte) interface{} {
 			respData = h.PipePull(funcCode, data)
 		case _FC_PipeLenght: //获取管道长度
 			respData = h.PipeLength(data)
+		case _FC_PipeAll: //获取管道长度
+			respData = h.PipeAll(data)
 		case _FC_GetKeys: //获取已经存在的所有键
 			respData = h.GetKeys()
 		case _FC_GetUsers: //获取已经存在的所有用户名
@@ -338,6 +346,22 @@ func (h *ConnHandel) PipePull(fc byte, data []byte) RespMsg {
 			resp = MakeRespMsg(false, fmt.Sprintf("%d", l), err.Error()) //无数据的时候长度为-1,其他错误时长度为0
 		} else {
 			resp = MakeRespMsg(true, fmt.Sprintf("%d", l), data)
+		}
+	}
+	return resp
+}
+
+//从管道拉取数据
+func (h *ConnHandel) PipeAll(data []byte) RespMsg {
+	var resp RespMsg
+	if key, err := decodeKey(data); err != nil {
+		resp = MakeRespMsg(false, "PipeAll.decodeKey", err.Error())
+	} else {
+		l, err := Db.MmPipeAll(key)
+		if err != nil {
+			resp = MakeRespMsg(false, "get pipe all fail", err.Error()) //无数据的时候长度为-1,其他错误时长度为0
+		} else {
+			resp = MakeRespMsg(true, key, l)
 		}
 	}
 	return resp

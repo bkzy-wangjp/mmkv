@@ -341,6 +341,36 @@ func (db *MemoryKeyValueMap) MmPipePull(fc byte, key string) (int, interface{}, 
 	}
 }
 
+//获取管道中的所有数据
+//返回管道剩余长度和错误信息
+func (db *MemoryKeyValueMap) MmPipeAll(key string) ([]interface{}, error) {
+	//logs.Debug(i18n("log_debug_pipe_len"), key)
+	oldv, ok := db.Load(key) //加载标签
+	if ok {                  //标签存在
+		oldtype := reflect.TypeOf(oldv)
+		if oldtype.Kind() != reflect.Slice { //原值非切片类型
+			return nil, fmt.Errorf(i18n("data_type_fail"), oldtype) //数据类型错误
+		} else { //原值为切片类型
+			vslice, ok := oldv.([]interface{})
+			if !ok {
+				return nil, fmt.Errorf(i18n("data_assert_fail"), oldtype) //数据断言错误
+			} else {
+				if len(vslice) > 0 { //数据长度大于0
+					val := make([]interface{}, len(vslice))
+					copy(val, vslice)
+					vslice = vslice[0:0]
+					db.Store(key, vslice)
+					return val, nil
+				} else { //切片中已经没有数据
+					return nil, fmt.Errorf(i18n("no_data_in_pipe")) //管道中已经没有数据
+				}
+			}
+		}
+	} else { //标签不存在
+		return nil, fmt.Errorf(i18n("undefined_key"), key) //未定义的标签
+	}
+}
+
 //获取管道长度
 //返回管道剩余长度和错误信息
 func (db *MemoryKeyValueMap) MmPipeLength(key string) (int, error) {

@@ -169,3 +169,14 @@ func PipeLength(tag string) (int64, float64, error) {
 func PipePull(tag, ptype string) (int64, interface{}, float64, error) {
 	return _POOL.PipePull(tag, ptype)
 }
+
+//从管道中拉取所有数据
+//请求参数:
+// tag string : 标签名
+//反回参数:
+// interface{} : 获取到的数据
+// float64 : 执行耗时,单位秒
+// error : 错误信息
+func PipeAll(tag string) (interface{}, float64, error) {
+	return _POOL.PipeAll(tag)
+}
