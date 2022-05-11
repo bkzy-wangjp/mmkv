@@ -632,6 +632,8 @@ func (p *ConnPool) PipePull(tag, ptype string) (int64, interface{}, float64, err
 		fc = _FC_PipeFiFoPull
 	case "filo", "lifo":
 		fc = _FC_PipeFiLoPull
+	case "all":
+		fc = _FC_PipeAll
 	default:
 		return 0, 0, 0., fmt.Errorf(i18n("log_pipe_pull_type_err"), ptype)
 	}

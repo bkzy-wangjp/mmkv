@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 
 	"github.com/beego/beego/v2/core/logs"
 	crc16 "github.com/bkzy-wangjp/CRC16"
@@ -82,18 +83,27 @@ func encodeResponse(funcCode, reverse byte, data []byte) []byte {
 //解析单个key
 func decodeKey(hex_data []byte) (key string, err error) {
 	err = json.Unmarshal(hex_data, &key)
+	key = strings.ToLower(key)
 	return
 }
 
 //解析多个key
 func decodeKeys(hex_data []byte) (keys []string, err error) {
 	err = json.Unmarshal(hex_data, &keys)
+	for i, k := range keys {
+		keys[i] = strings.ToLower(k)
+	}
 	return
 }
 
 //解析key\value Map
 func decodeMap(hex_data []byte) (kvs map[string]interface{}, err error) {
-	err = json.Unmarshal(hex_data, &kvs)
+	maps := make(map[string]interface{})
+	kvs = make(map[string]interface{})
+	err = json.Unmarshal(hex_data, &maps)
+	for k, v := range maps {
+		kvs[strings.ToLower(k)] = v
+	}
 	return
 }
 
