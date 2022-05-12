@@ -189,13 +189,13 @@ func (h *ConnHandel) functionExec(funcCode byte, data []byte) interface{} {
 			respData = MakeRespMsg(false, "fcode_undefined", fmt.Sprintf(i18n("fcode_undefined"), funcCode))
 		}
 	}
-	if funcCode > 1 {
-		fcmsg, ok := _FC_MAP[funcCode]
-		if !ok {
-			fcmsg = fmt.Sprintf("Undefined Function Code:%X", funcCode)
-		}
-		logs.Debug("%s -> %s : %s", h.Conn.RemoteAddr(), fcmsg, string(data))
-	}
+	//if funcCode > 1 {
+	//fcmsg, ok := _FC_MAP[funcCode]
+	//if !ok {
+	//fcmsg = fmt.Sprintf("Undefined Function Code:%X", funcCode)
+	//}
+	//logs.Debug("%s -> %s : %s", h.Conn.RemoteAddr(), fcmsg, string(data))
+	//}
 	return respData
 }
 
