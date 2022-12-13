@@ -174,6 +174,9 @@ func selfAdd(oldval interface{}, increment int64) (interface{}, error) {
 
 //判断是否数字类型的值
 func isNumber(value interface{}) (bool, reflect.Type) {
+	if value == nil {
+		return false, nil
+	}
 	vtype := reflect.TypeOf(value)
 	switch vtype.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:

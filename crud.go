@@ -165,9 +165,11 @@ func (db *MemoryKeyValueMap) MmWriteSingle(key string, value interface{}) (inter
 	if ok {                  //标签存在
 		oldisnum, oldtype := isNumber(oldv)
 		newisnum, newtype := isNumber(value)
-		if oldtype != newtype { //数据类型不同
-			if !oldisnum || !newisnum { //且至少有一个不是数字
-				return oldv, fmt.Errorf(i18n("write_type_mismatch"), oldtype, newtype) //返回错误信息
+		if oldtype != nil {
+			if oldtype != newtype { //数据类型不同
+				if !oldisnum || !newisnum { //且至少有一个不是数字
+					return oldv, fmt.Errorf(i18n("write_type_mismatch"), oldtype, newtype) //返回错误信息
+				}
 			}
 		}
 	} //else {
