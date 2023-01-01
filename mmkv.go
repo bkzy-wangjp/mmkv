@@ -18,8 +18,38 @@ import (
 //        "port":9646 //端口号
 //        "ip": "127.0.0.1"//IP地址
 //        "languige":"zh-CN"//语言类型
+//        "loglevel":8
+//		  "logpath":"../log"
+// 		  "logsize":100000
+//        "logsavedays":180
 //    }
 func Run(users map[string]string, cfg map[string]interface{}) error {
+	logpath, ok := cfg["logpath"]
+	if !ok {
+		logpath = "./log/mmkv.log"
+	} else {
+		logpath = fmt.Sprintf("%v/%s", logpath, "mmkv.log")
+	}
+	logsize, ok := cfg["logsize"]
+	if !ok {
+		logsize = 100000
+	}
+	logsavedays, ok := cfg["logsavedays"]
+	if !ok {
+		logsavedays = 180
+	}
+	loglevel, ok := cfg["loglevel"]
+	if !ok {
+		loglevel = 8
+	}
+
+	logs.SetLogger(logs.AdapterConsole, fmt.Sprintf(`{"level":%d,"color":true}`, loglevel)) //屏幕输出设置
+	logset := fmt.Sprintf(`{"filename":"%s","level":%d,"maxlines":%d,"maxsize":0,"daily":true,"maxdays":%d,"separate":["error", "warning", "info", "debug"]}`, logpath, loglevel, logsize, logsavedays)
+	logs.SetLogger(logs.AdapterMultiFile, logset) //文件输出设置
+
+	logs.Info(i18n("内存数据库启动"))
+	logs.Info("%s:%v", i18n("启动参数"), cfg)
+
 	languige, ok := cfg["languige"]
 	if !ok {
 		languige = "zh-CN"
@@ -114,20 +144,21 @@ func decodeUserMsg(hex_data []byte) (user UserMsg, err error) {
 }
 
 //通过错误码获取错误信息
-func i18n(ecode string, lang ...string) string {
-	if len(lang) == 0 {
-		return Db.getErrorMsg(ecode)
-	} else {
-		ecode, ok := textDictionary[ecode]
-		if !ok {
-			ecode = unDefined
-		}
-		msg, ok := ecode[lang[0]]
-		if !ok {
-			msg = fmt.Sprintf("Undefined languige type:%s", lang[0])
-		}
+func i18n(msg string, lang ...string) string {
+	langtype := Db.Langtype
+	if len(lang) > 0 {
+		langtype = lang[0]
+	}
+
+	ecode, ok := textDictionary[msg]
+	if !ok {
 		return msg
 	}
+	rmsg, ok := ecode[langtype]
+	if !ok {
+		rmsg = msg
+	}
+	return rmsg
 }
 
 //连接反馈信息格式化

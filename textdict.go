@@ -28,8 +28,8 @@ var (
 			"en-US": "No valid label is set when writing label",
 			"zh-CN": "写标签时未设定有效的标签"},
 		"undefined_key": {
-			"en-US": "Undefined key:%s",
-			"zh-CN": "未定义的标签:%s"},
+			"en-US": "Undefined key",
+			"zh-CN": "未定义的标签"},
 		"data_type_fail_add": {
 			"en-US": "The data type is incorrect. Addition and subtraction operations cannot be performed. The type is:%v",
 			"zh-CN": "数据类型不正确,不可执行加减运算. 数据类型是:%v"},
@@ -121,7 +121,73 @@ var (
 		"log_debug_pipe_len": {
 			"en-US": "[MmKv] Get pipe length:%s",
 			"zh-CN": "[MmKv] 获取管道的长度:%s"},
+		"未定义": {
+			"en-US": "Undifend",
+			"zh-CN": "未定义"},
+		"连接测试": {
+			"en-US": "Ping",
+			"zh-CN": "连接测试"},
+		"用户登录": {
+			"en-US": "Login",
+			"zh-CN": "用户登录"},
+		"写单个标签": {
+			"en-US": "WriteSingleKey",
+			"zh-CN": "写单个标签"},
+		"写多个标签": {
+			"en-US": "WriteMultiKey",
+			"zh-CN": "写多个标签"},
+		"读取单个标签": {
+			"en-US": "ReadSingleKey",
+			"zh-CN": "读取单个标签"},
+		"读取多个标签": {
+			"en-US": "ReadMultiKey",
+			"zh-CN": "读取多个标签"},
+		"删除单个标签": {
+			"en-US": "DeleteSingleKey",
+			"zh-CN": "删除单个标签"},
+		"删除多个标签": {
+			"en-US": "DeleteMultiKey",
+			"zh-CN": "删除多个标签"},
+		"数据自增": {
+			"en-US": "SelfIncrease",
+			"zh-CN": "数据自增"},
+		"数据自减": {
+			"en-US": "SelfDecrease",
+			"zh-CN": "数据自减"},
+		"压入管道": {
+			"en-US": "PipePush",
+			"zh-CN": "压入管道"},
+		"从管道拉取(FIFO)": {
+			"en-US": "PipeFiFoPull",
+			"zh-CN": "从管道拉取(FIFO)"},
+		"从管道拉取(FILO)": {
+			"en-US": "PipeFiLoPull",
+			"zh-CN": "从管道拉取(FILO)"},
+		"获取管道当前长度": {
+			"en-US": "PipeLenght",
+			"zh-CN": "获取管道当前长度"},
+		"读取管道": {
+			"en-US": "PipeAll",
+			"zh-CN": "读取管道"},
+		"读取键": {
+			"en-US": "GetKeys",
+			"zh-CN": "读取键"},
+		"读取用户列表": {
+			"en-US": "GetUsers",
+			"zh-CN": "读取用户列表"},
+		"功能码": {
+			"en-US": "Function Code",
+			"zh-CN": "功能码"},
+		"保留字节": {
+			"en-US": "Reserved Bytes",
+			"zh-CN": "保留字节"},
+		"数据内容": {"en-US": "Data",
+			"zh-CN": "数据内容"},
+		"响应信息": {"en-US": "Respond Message",
+			"zh-CN": "响应信息"},
+		"内存数据库启动": {"en-US": "mmkv start",
+			"zh-CN": "内存数据库启动"},
+		"启动参数": {"en-US": "Start parameters",
+			"zh-CN": "启动参数"},
 	}
-	//未定义文本
-	unDefined = map[string]string{"zh-CN": "未定义的文本字典", "en-US": "Undefined code"}
 )

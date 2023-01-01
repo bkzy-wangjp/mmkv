@@ -229,17 +229,19 @@ func (db *MemoryKeyValueMap) MmDeleteMulti(keys []string) int64 {
 }
 
 //通过错误码获取错误信息
+/*
 func (db *MemoryKeyValueMap) getErrorMsg(code string) (errstr string) {
 	ecode, ok := textDictionary[code]
 	if !ok {
-		ecode = unDefined
+		return code
 	}
 	msg, ok := ecode[db.Langtype]
 	if !ok {
-		msg = fmt.Sprintf("Undefined languige type:%s", db.Langtype)
+		msg = code
 	}
 	return msg
 }
+*/
 
 //标签自增
 func (db *MemoryKeyValueMap) MmSelfIncrease(key string, value int64) (interface{}, error) {

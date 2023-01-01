@@ -12,14 +12,22 @@ var (
 	MMKV_USER = flag.String("u", "admin", "mmkv内存数据库的登录用户名")
 	MMKV_PSWD = flag.String("psw", "admin123", "mmkv内存数据库的登录用户密码")
 	MMKV_LANG = flag.String("lang", "zh-CN", "语言类型")
+	MMKV_LOGL = flag.Int("logl", 7, "日志等级")
+	MMKV_LOGP = flag.String("logp", "./log", "日志存储路径")
+	MMKV_LOGS = flag.Int("logs", 100000, "日志文件最大行数")
+	MMKV_LOGD = flag.Int("logd", 180, "日志保存天数")
 )
 
 func main() {
 	flag.Parse()
 	mmkv.Run(map[string]string{*MMKV_USER: *MMKV_PSWD},
 		map[string]interface{}{
-			"ip":       *MMKV_HOST,
-			"port":     *MMKV_PORT,
-			"languige": *MMKV_LANG,
+			"ip":          *MMKV_HOST,
+			"port":        *MMKV_PORT,
+			"languige":    *MMKV_LANG,
+			"loglevel":    *MMKV_LOGL,
+			"logpath":     *MMKV_LOGP,
+			"logsize":     *MMKV_LOGS,
+			"logsavedays": *MMKV_LOGD,
 		})
 }

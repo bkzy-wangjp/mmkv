@@ -109,7 +109,7 @@ func (h *ConnHandel) processData(buf []byte) error {
 	} else { //报文长度合格
 		hex_data, ok := crc16.BytesCheckCRC(buf) //CRC16校验
 		if !ok {                                 //校验不正确
-			msg := i18n("log_err_check_code")
+			msg := fmt.Sprintf("%s:%x", i18n("log_err_check_code"), buf)
 			logs.Error(msg)
 			resp.Ok = false
 			resp.Msg = "log_err_check_code"
@@ -120,8 +120,13 @@ func (h *ConnHandel) processData(buf []byte) error {
 			if err != nil {
 				logs.Error(i18n("log_err_splite_data"), err.Error())
 			}
-			//logs.Debug("功能码:%X,保留字节:%X,数据内容:%s", fc, hex_data[1], string(data))
 			respData = h.functionExec(fc, data) //执行功能码,返回数据
+
+			logs.Debug("%s:[%X]%s,%s:%X,%s:%s,%s:%v",
+				i18n("功能码"), fc, i18n(_FC_MAP[fc]),
+				i18n("保留字节"), hex_data[1],
+				i18n("数据内容"), string(data),
+				i18n("响应信息"), respData)
 		}
 	}
 	respbytes, err := json.Marshal(respData) //将结构数据转换为字节
@@ -207,7 +212,7 @@ func (h *ConnHandel) ReadSingle(data []byte) RespMsg {
 	} else {
 		resp.Data, resp.Ok = Db.MmReadSingle(key)
 		if !resp.Ok {
-			resp.Data = fmt.Sprintf(i18n("undefined_key"), key)
+			resp.Data = fmt.Sprintf("%s: %s", i18n("undefined_key"), key)
 		}
 		resp.Msg = key
 	}
