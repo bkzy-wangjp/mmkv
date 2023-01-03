@@ -31,16 +31,17 @@ type ConnHandel struct {
 }
 
 //新建通道连接句柄
-func newConneHandle(username, password, address string) (*ConnHandel, error) {
+func newConneHandle(timeout int64, username, password, address string) (*ConnHandel, error) {
 	handle := new(ConnHandel)
 	handle.CreatedAt = time.Now()
+	handle.timeout = timeout
 	err := handle.dial(address) //建立连接
 	if err != nil {
-		return nil, err
+		return handle, err
 	}
 	err = handle.login(username, password) //登录
 	if err != nil {
-		return nil, err
+		return handle, err
 	}
 	return handle, nil
 }
@@ -61,15 +62,22 @@ func (h *ConnHandel) dial(addr string) error {
 	return err
 }
 
-//建立与服务器的连接
+//测试与服务器的连接
 func (h *ConnHandel) ping() (float64, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			h.ConnServer = false
+		}
+	}()
 	var data []byte
 	st := time.Now()
 	msg, err := h.write(_FC_Ping, data)
 	if err != nil {
+		h.ConnServer = false
 		return 0, err
 	}
 	if !msg.Ok {
+		h.ConnServer = false
 		return 0, fmt.Errorf("%s", msg.Data)
 	}
 	return time.Since(st).Seconds(), nil
@@ -81,6 +89,7 @@ func (h *ConnHandel) login(username, password string) error {
 	user := new(UserMsg)
 	user.Username = username
 	user.Password = password
+	h.Logged = false
 	msgdata, err := json.Marshal(user) //将结构数据转换为字节
 	if err != nil {
 		return fmt.Errorf(i18n("log_err_user_marshal"), err.Error())
@@ -140,6 +149,7 @@ func (h *ConnHandel) read() (*RespMsg, error) {
 
 	var buf []byte
 	var crccheckok bool
+	st := time.Now()
 	isend := false //是否读取结束
 	for {
 		//read from the connection
@@ -169,6 +179,9 @@ func (h *ConnHandel) read() (*RespMsg, error) {
 			} else {
 				break
 			}
+		}
+		if time.Duration(time.Since(st).Seconds()) > time.Second*time.Duration(h.timeout) {
+			return nil, fmt.Errorf(i18n("超时"))
 		}
 	}
 	return h.processData(buf, crccheckok)
@@ -242,15 +255,18 @@ func decodeResponse(hex_data []byte) (*RespMsg, error) {
 }
 
 //自由请求接口
-//请求参数:
-// funcCode byte : 功能码
-// msg interface{} : 符合json结构和功能码要求的信息
+//  请求参数:
+//   funcCode byte : 功能码
+//   msg interface{} : 符合json结构和功能码要求的信息
 //反回参数：
-// *RespMsg : 服务器返回的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息(已经判断是否ok)
+//   *RespMsg : 服务器返回的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息(已经判断是否ok)
 func (h *ConnHandel) request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 	st := time.Now()
+	if !h.ConnServer {
+		return nil, time.Since(st).Seconds(), fmt.Errorf(i18n("尚未建立与mmkv服务器的连接"))
+	}
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return nil, 0, err
@@ -260,7 +276,7 @@ func (h *ConnHandel) request(funcCode byte, msg interface{}) (*RespMsg, float64,
 		return nil, time.Since(st).Seconds(), err
 	}
 	if resp == nil {
-		return nil, time.Since(st).Seconds(), fmt.Errorf("response is null")
+		return nil, time.Since(st).Seconds(), fmt.Errorf(i18n("响应数据为空"))
 	}
 	if !resp.Ok {
 		return nil, time.Since(st).Seconds(), fmt.Errorf("%s", resp.Data)

@@ -63,8 +63,8 @@ type ConnPool struct {
 }
 
 /*******************************************************************************
-- 功能:实例化工作池
-- 参数:
+  -功能:实例化工作池
+  -参数:
 	[hostname]  字符串，输入，服务器的网络地址或机器名,默认值 127.0.0.1
 	[username]	用户名,字符串,缺省值 admin
 	[password]	密码,字符串,缺省值 admin123
@@ -78,10 +78,10 @@ type ConnPool struct {
 - 备注:
 - 时间: 2020年6月27日
 *******************************************************************************/
-func NewConnPool(params map[string]interface{}) (*ConnPool, error) {
+func NewConnPool(params map[string]interface{}) *ConnPool {
 	var hostname, username, password, langtype string = "127.0.0.1", "admin", "admin123", _Langtype
 	var port, size int = 9646, 50
-	var timeout, max_sec int64 = 3000, 3600
+	var timeout, max_sec int64 = 3000, 60
 	for k, v := range params {
 		switch k {
 		case "hostname":
@@ -119,7 +119,7 @@ func NewConnPool(params map[string]interface{}) (*ConnPool, error) {
 		max_sec = 60
 	}
 	if max_sec <= 0 {
-		max_sec = 3600
+		max_sec = 60
 	}
 	if len(password) != 32 { //密码必须是MD5后的值
 		sum := md5.Sum([]byte(password))
@@ -139,54 +139,48 @@ func NewConnPool(params map[string]interface{}) (*ConnPool, error) {
 		password:   password,                     //密码
 		Version:    VERSION,                      //程序版本
 	}
-	var err error
 	for i := 0; i < size; i++ { //创建句柄连接池
 		pool.addConn()
 	}
 	go pool.run()
-	return pool, err
+	return pool
 }
 
 //添加连接
 func (p *ConnPool) addConn() error {
-	handle, err := newConneHandle(p.username, p.password, p.address)
-	if err != nil {
-		return err
-	}
+	handle, err := newConneHandle(p.timeout, p.username, p.password, p.address)
 	p.maxId += 1
 	handle.Id = p.maxId
 	p.Conns = append(p.Conns, handle) //放入连接池
 	p.ConnChan <- handle              //将句柄压入连接池管道
-	return nil
+	return err
 }
 
 /*******************************************************************************
-- 功能:连接池运行
-- 参数:无
-- 输出:无
-- 备注: 自动释放超时的链接
-- 时间: 2021年4月14日
+	- 功能:连接池运行
+	- 参数:无
+	- 输出:无
+	- 备注: 自动释放超时的链接
+	- 时间: 2021年4月14日
 *******************************************************************************/
 func (p *ConnPool) run() {
 	defer p.close()
 	for {
 		for _, c := range p.Conns { //遍历连接池
-			if c.ConnServer { //如果处于连接状态
-				if _, err := c.ping(); err != nil { //检查连接是否可用
-					c.ConnServer = false
-				}
+			if c.ConnServer && !c.Working { //如果处于连接状态
+				c.ping() //检查连接是否可用
 			}
 			if (c.Working && time.Since(c.WorkeAt).Seconds() >= float64(p.maxSec)) || !c.ConnServer { //租用超时或者失去与服务器的连接
-				c.Working = false //停止工作
-				if c.ConnServer {
-					c.Conn.Close() //关闭接口
-				}
+				//if c.ConnServer {
+				c.Conn.Close() //关闭接口
+				//}
 				if err := c.dial(p.address); err == nil { //重连接
 					c.login(p.username, p.password)
 				}
+				c.Working = false //停止工作
 			}
 		}
-		time.Sleep(time.Second * 60)
+		time.Sleep(time.Second * 10)
 		if len(p.Conns) < p.size { //检查工作池是否还有足够的大小
 			for i := 0; i < p.size-len(p.Conns); i++ {
 				p.addConn()
@@ -212,13 +206,13 @@ func (p *ConnPool) close() {
 }
 
 //自由请求接口
-//请求参数:
-// funcCode byte : 功能码
-// msg interface{} : 符合json结构和功能码要求的信息
+//  请求参数:
+//   funcCode byte : 功能码
+//   msg interface{} : 符合json结构和功能码要求的信息
 //反回参数：
-// interface{} : 服务器返回的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{} : 服务器返回的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) Request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -236,12 +230,12 @@ func (p *ConnPool) Request(funcCode byte, msg interface{}) (*RespMsg, float64, e
 }
 
 //获取所有的非系统KEYS
-//请求参数:
-// 无
+//  请求参数:
+//   无
 //反回参数：
-// interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//  interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
+//  float64 : 执行耗时,单位秒
+//  error : 错误信息
 func (p *ConnPool) GetKeys() ([]interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -267,12 +261,12 @@ func (p *ConnPool) GetKeys() ([]interface{}, float64, error) {
 }
 
 //获取所有的用户名列表
-//请求参数:
-// 无
+//  请求参数:
+//   无
 //反回参数：
-// interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) GetUsers() ([]string, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -302,12 +296,12 @@ func (p *ConnPool) GetUsers() ([]string, float64, error) {
 }
 
 //读取标签
-//请求参数:
-// tags ...string : 标签名
+//  请求参数:
+//   tags ...string : 标签名
 //反回参数：
-// interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{} : 标签所对应的数据,单个标签时为data，多个标签时为[]{Ok:bool,Msg:string,Data:interface{}}
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) Read(tags ...string) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -339,12 +333,12 @@ func (p *ConnPool) Read(tags ...string) (interface{}, float64, error) {
 }
 
 //写标签
-//请求参数:
-// kvs map[string]interface{} : 需要写入的数据
+//  请求参数:
+//   kvs map[string]interface{} : 需要写入的数据
 //反回参数：
-// interface{}: 返回的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{}: 返回的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) Write(key string, val interface{}) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -367,12 +361,12 @@ func (p *ConnPool) Write(key string, val interface{}) (interface{}, float64, err
 }
 
 //写多个标签
-//请求参数:
-// kvs map[string]interface{} : 需要写入的数据
+//  请求参数:
+//   kvs map[string]interface{} : 需要写入的数据
 //反回参数：
-// interface{}: 返回的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{}: 返回的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) Writes(kvs map[string]interface{}) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -395,12 +389,12 @@ func (p *ConnPool) Writes(kvs map[string]interface{}) (interface{}, float64, err
 }
 
 //删除标签
-//请求参数:
-// tags ...string : 标签名
+//  请求参数:
+//   tags ...string : 标签名
 //反回参数：
-// bool : 删除的结果
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   bool : 删除的结果
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) Delete(tags ...string) (bool, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -423,11 +417,11 @@ func (p *ConnPool) Delete(tags ...string) (bool, float64, error) {
 }
 
 //服务器时间
-//请求参数:无
+//  请求参数:无
 //反回参数：
-// time.Time : 时间
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   time.Time : 时间
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) ServerTime() (time.Time, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -460,12 +454,12 @@ func (p *ConnPool) ServerTime() (time.Time, float64, error) {
 }
 
 //标签自增
-//请求参数:
-// tag string : 标签名
+//  请求参数:
+//   tag string : 标签名
 //反回参数：
-// int64 : 当前值
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   int64 : 当前值
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) SelfIncrease(tag string) (int64, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -496,12 +490,12 @@ func (p *ConnPool) SelfIncrease(tag string) (int64, float64, error) {
 }
 
 //标签自减
-//请求参数:
-// tag string : 标签名
+//  请求参数:
+//   tag string : 标签名
 //反回参数：
-// int64 : 当前值
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   int64 : 当前值
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) SelfDecrease(tag string) (int64, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -532,13 +526,13 @@ func (p *ConnPool) SelfDecrease(tag string) (int64, float64, error) {
 }
 
 //压入管道
-//请求参数:
-// key string 标签名
-// value interface{} 数值
+//  请求参数:
+//   key string 标签名
+//   value interface{} 数值
 //反回参数：
-// int64: 当前管道长度
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   int64: 当前管道长度
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) PipePush(key string, value interface{}) (int64, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -569,12 +563,12 @@ func (p *ConnPool) PipePush(key string, value interface{}) (int64, float64, erro
 }
 
 //获取管道当前的长度
-//请求参数:
-// tag string : 标签名
+//  请求参数:
+//   tag string : 标签名
 //反回参数：
-// int64 : 当前管道长度
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   int64 : 当前管道长度
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) PipeLength(tag string) (int64, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -605,14 +599,14 @@ func (p *ConnPool) PipeLength(tag string) (int64, float64, error) {
 }
 
 //从管道中拉取数据
-//请求参数:
-// tag string : 标签名
-// ptype string : 拉取方式, "FIFO"、"LILO"或"FILO"、"LIFO"(不区分大小写)
+//  请求参数:
+//   tag string : 标签名
+//   ptype string : 拉取方式, "FIFO"、"LILO"或"FILO"、"LIFO"(不区分大小写)
 //反回参数:
-// int64 : 剩余长度
-// interface{} : 获取到的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   int64 : 剩余长度
+//   interface{} : 获取到的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) PipePull(tag, ptype string) (int64, interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起
@@ -648,11 +642,11 @@ func (p *ConnPool) PipePull(tag, ptype string) (int64, interface{}, float64, err
 
 //从管道中拉取所有数据
 //请求参数:
-// tag string : 标签名
+//   tag string : 标签名
 //反回参数:
-// interface{} : 获取到的数据
-// float64 : 执行耗时,单位秒
-// error : 错误信息
+//   interface{} : 获取到的数据
+//   float64 : 执行耗时,单位秒
+//   error : 错误信息
 func (p *ConnPool) PipeAll(tag string) (interface{}, float64, error) {
 	p.ReqChan <- 1         //请求列队加1,如无足够资源，则挂起
 	p.WorkerChan <- 1      //工作队列加1,如果无足够资源,则挂起

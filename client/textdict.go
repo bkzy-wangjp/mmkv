@@ -1,7 +1,5 @@
 package client
 
-import "fmt"
-
 var (
 	_Langtype string = "zh-CN" //language type,like:en-US,zh-CN
 
@@ -109,20 +107,27 @@ var (
 		"log_debug_delete_multi": {
 			"en-US": "[MicMmdb] Delete Multi keys: %v",
 			"zh-CN": "[MicMmdb] 批量删除标签: %v"},
+		"超时": {
+			"en-US": "[MicMmdb] Time Out",
+			"zh-CN": "[MicMmdb] 超时"},
+		"响应数据为空": {
+			"en-US": "[MicMmdb] Response is null",
+			"zh-CN": "[MicMmdb] 响应数据为空"},
+		"尚未建立与mmkv服务器的连接": {
+			"en-US": "[MicMmdb] No Connect to mmkv server",
+			"zh-CN": "[MicMmdb] 尚未建立与mmkv服务器的连接"},
 	}
-	//未定义文本
-	unDefined = map[string]string{"zh-CN": "未定义的文本字典", "en-US": "Undefined code"}
 )
 
 //国际化信息输出
 func i18n(code string) string {
 	ecode, ok := textDictionary[code]
 	if !ok {
-		ecode = unDefined
+		return code
 	}
 	msg, ok := ecode[_Langtype]
 	if !ok {
-		msg = fmt.Sprintf("Undefined languige type:%s", _Langtype)
+		return code
 	}
 	return msg
 }
