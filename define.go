@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	VERSION      = "v0.0.1"         //版本号
+	VERSION      = "v1.0.0"         //版本号
 	_ReedBufSize = 1024 * 1024      //读信息通道缓存字节数
 	_UsersDict   = "sys.users.dict" //用户字典
 	_KeysDict    = "sys.keys.dict"  //键名称字典

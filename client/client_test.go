@@ -252,3 +252,10 @@ func TestGetUsers(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleClose(t *testing.T) {
+	h := new(ConnHandel)
+	if h.Conn != nil {
+		h.Conn.Close()
+	}
+}

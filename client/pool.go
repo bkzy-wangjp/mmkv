@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	VERSION      = "v0.0.1"    //版本号
+	VERSION      = "v1.0.0"    //版本号
 	_ReedBufSize = 1024 * 1024 //读信息通道缓存字节数
 	//功能码定义(Function Code)
 	_FC_Ping            = 0x01 //测试,获取当前时间的UNIX毫秒值
@@ -171,9 +171,9 @@ func (p *ConnPool) run() {
 				c.ping() //检查连接是否可用
 			}
 			if (c.Working && time.Since(c.WorkeAt).Seconds() >= float64(p.maxSec)) || !c.ConnServer { //租用超时或者失去与服务器的连接
-				//if c.ConnServer {
-				c.Conn.Close() //关闭接口
-				//}
+				if c.Conn != nil {
+					c.Conn.Close() //关闭接口
+				}
 				if err := c.dial(p.address); err == nil { //重连接
 					c.login(p.username, p.password)
 				}

@@ -77,3 +77,6 @@ func main() {
 |0x0C    |从管道拉取(FIFO)|`"tag_pipe"`|`{"ok":true,"msg":"3","data":123456.789}`|
 |0x0D    |从管道拉取(FILO)|`"tag_pipe"`|`{"ok":true,"msg":"2","data":123456.789}`|
 |0x0E    |获取管道当前长度 |`"tag_pipe"`|`{"ok":true,"msg":"tag_pipe","data":2}`|
+|0x0F    |一次性读取管道中的所有数据|无|`{"ok":true,"msg":"tag_pipe","data":2}`|
+|0x10    |获取所有已经存在的键|无|`{"ok":true,"msg":"","data":[...]}`|
+|0x11    |获取所有已经存在的用户名|无|`{"ok":true,"msg":"","data":[...]}`|
