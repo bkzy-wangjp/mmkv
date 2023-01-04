@@ -29,7 +29,7 @@ func main() {
 		"port":     *MMKV_PORT,
 		"size":     *MMKV_SIZE,
 		"timeout":  3000,
-		"max_sec":  3600,
+		"max_sec":  60,
 	})
 	var cmd, key string
 lable:
