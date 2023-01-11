@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"path"
 	"reflect"
 	"strings"
 
@@ -22,13 +23,14 @@ import (
 //		  "logpath":"../log"
 // 		  "logsize":100000
 //        "logsavedays":180
+//        "logshowpath":false
 //    }
 func Run(users map[string]string, cfg map[string]interface{}) error {
 	logpath, ok := cfg["logpath"]
 	if !ok {
 		logpath = "./log/mmkv.log"
 	} else {
-		logpath = fmt.Sprintf("%v/%s", logpath, "mmkv.log")
+		logpath = path.Join(fmt.Sprint(logpath), "mmkv.log")
 	}
 	logsize, ok := cfg["logsize"]
 	if !ok {
@@ -42,13 +44,21 @@ func Run(users map[string]string, cfg map[string]interface{}) error {
 	if !ok {
 		loglevel = 8
 	}
-
+	logshowpath, ok := cfg["logshowpath"]
+	if !ok {
+		logshowpath = false
+	}
+	showpath, ok := logshowpath.(bool)
+	if !ok {
+		showpath = false
+	}
 	logs.SetLogger(logs.AdapterConsole, fmt.Sprintf(`{"level":%d,"color":true}`, loglevel)) //屏幕输出设置
-	logset := fmt.Sprintf(`{"filename":"%s","level":%d,"maxlines":%d,"maxsize":0,"daily":true,"maxdays":%d,"separate":["error", "warning", "info", "debug"]}`, logpath, loglevel, logsize, logsavedays)
+	logset := fmt.Sprintf(`{"filename":"%s","level":%d,"maxlines":%d,"maxsize":0,"daily":true,"maxdays":%d}`, logpath, loglevel, logsize, logsavedays)
 	logs.SetLogger(logs.AdapterMultiFile, logset) //文件输出设置
+	logs.EnableFuncCallDepth(showpath)
 
 	logs.Info(i18n("内存数据库启动"))
-	logs.Info("%s:%v", i18n("启动参数"), cfg)
+	logs.Debug("%s:%+v", i18n("启动参数"), cfg)
 
 	languige, ok := cfg["languige"]
 	if !ok {
