@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	VERSION      = "v1.0.0"    //版本号
-	_ReedBufSize = 1024 * 1024 //读信息通道缓存字节数
+	VERSION      = "v1.0.0"        //版本号
+	_ReedBufSize = 1024 * 1024 * 5 //读信息通道缓存字节数
 	//功能码定义(Function Code)
 	_FC_Ping            = 0x01 //测试,获取当前时间的UNIX毫秒值
 	_FC_Login           = 0x02 //登录

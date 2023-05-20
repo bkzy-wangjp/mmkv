@@ -91,7 +91,7 @@ func Run(users map[string]string, cfg map[string]interface{}) error {
 			logs.Error(i18n("log_err_new_conn"), err.Error())
 			continue
 		}
-		logs.Info(i18n("log_info_new_conn"), conn.RemoteAddr())
+		//logs.Info(i18n("log_info_new_conn"), conn.RemoteAddr())
 		handle := newConneHandle(conn)
 		handle.Id = id
 		ConnPool = append(ConnPool, handle)

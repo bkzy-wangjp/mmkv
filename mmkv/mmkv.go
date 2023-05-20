@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/bkzy-wangjp/mmkv"
 )
@@ -21,7 +22,13 @@ var (
 
 func main() {
 	flag.Parse()
-	mmkv.Run(map[string]string{*MMKV_USER: *MMKV_PSWD},
+	users := strings.Split(*MMKV_USER, ",")
+	keys := strings.Split(*MMKV_PSWD, ",")
+	usermap := make(map[string]string)
+	for i, user := range users {
+		usermap[user] = keys[i]
+	}
+	mmkv.Run(usermap,
 		map[string]interface{}{
 			"ip":          *MMKV_HOST,
 			"port":        *MMKV_PORT,

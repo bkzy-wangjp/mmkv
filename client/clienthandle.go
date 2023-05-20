@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/beego/beego/v2/core/logs"
 	crc16 "github.com/bkzy-wangjp/CRC16"
 )
 
@@ -130,6 +131,7 @@ func (h *ConnHandel) write(fc byte, data []byte) (*RespMsg, error) {
 	respmsg, err := h.read()
 	if err != nil && !h.retry { //检查到错误有一次重发的机会
 		h.retry = true
+		logs.Warn("%s,%s:Fc=%X,data=%x", i18n("log_err_check_code"), i18n("重新发送数据"), fc, data)
 		return h.write(fc, data)
 	}
 	if h.retry {

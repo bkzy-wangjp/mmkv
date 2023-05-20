@@ -23,21 +23,21 @@ func newConneHandle(conn net.Conn) *ConnHandel {
 //连接句柄
 func (h *ConnHandel) handleConn() {
 	var buf []byte
-	read_start := make(chan bool, 10)
+	//read_start := make(chan bool, 10)
 	defer func() {
 		h.Conn.Close()
 		h.Closed = true
 		h.CloseAt = time.Now()
-		close(read_start)
+		//close(read_start)
 	}()
 	isend := true //是否读取结束
 	for {
 		//read from the connection
 		var rbuf = make([]byte, _ReedBufSize)
 		n, err := h.Conn.Read(rbuf) //读取缓冲通道，如果无数据则挂起
-		if !isend {
-			read_start <- true //开始读标记
-		}
+		///if !isend {
+		//	read_start <- true //开始读标记
+		//}
 		if err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "close") || strings.Contains(err.Error(), "aborted") { //客户端关闭
 				logs.Info(i18n("log_info_client_shutdown"), h.Conn.RemoteAddr())
@@ -54,30 +54,32 @@ func (h *ConnHandel) handleConn() {
 			//	n -= 1
 			//} else { //数据区满，但没有接收到结束符
 			isend = false
-			go func(nc net.Conn, done chan bool) {
-				n := 10
-				cnt := make(chan int, n)
-				for i := 0; i < n; i++ {
-					cnt <- i
-				}
-				defer close(cnt)
-				for {
-					select {
-					case c := <-cnt:
-						time.Sleep(1 * time.Millisecond)
-						if c == 9 {
-							isend = true
-							h.processData(buf)
-							buf = buf[:0]
+			/*
+				go func(nc net.Conn, done chan bool) {
+					chanlen := 10
+					cnt := make(chan int, chanlen)
+					for i := 0; i < chanlen; i++ {
+						cnt <- i
+					}
+					defer close(cnt)
+					for {
+						select {
+						case c := <-cnt:
+							time.Sleep(1 * time.Millisecond)
+							if c == 9 {
+								isend = true
+								h.processData(buf)
+								buf = buf[:0]
+								return
+							}
+						case <-done:
 							return
 						}
-					case <-done:
-						return
 					}
-				}
-			}(h.Conn, read_start)
+				}(h.Conn, read_start)
+			*/
 			//}
-			buf = append(buf, rbuf[:n]...) //保存临时缓冲区数据到全局缓冲区
+			//buf = append(buf, rbuf[:n]...) //保存临时缓冲区数据到全局缓冲区
 		} else { //缓冲区未满
 			isend = true //
 			//if rbuf[n-1] == '\n' || rbuf[n-1] == '\r' { //有结束符
@@ -85,9 +87,10 @@ func (h *ConnHandel) handleConn() {
 			//	rbuf = rbuf[:n-1]                                 //删除掉结束符
 			//	n -= 1
 			//}
-			buf = append(buf, rbuf[:n]...)
+			//buf = append(buf, rbuf[:n]...)
 		}
-		if isend { //接收数据结束
+		buf = append(buf, rbuf[:n]...) //保存临时缓冲区数据到全局缓冲区
+		if isend {                     //接收数据结束
 			h.processData(buf)
 			buf = buf[:0]
 		}
@@ -109,7 +112,7 @@ func (h *ConnHandel) processData(buf []byte) error {
 	} else { //报文长度合格
 		hex_data, ok := crc16.BytesCheckCRC(buf) //CRC16校验
 		if !ok {                                 //校验不正确
-			msg := fmt.Sprintf("%s:%x", i18n("log_err_check_code"), buf)
+			msg := fmt.Sprintf("[%s]%s:%x", h.User, i18n("log_err_check_code"), buf)
 			logs.Error(msg)
 			resp.Ok = false
 			resp.Msg = "log_err_check_code"

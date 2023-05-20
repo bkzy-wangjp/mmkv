@@ -38,14 +38,17 @@ func (db *MemoryKeyValueMap) MmAddUser(username, password string) error {
 			if _, ok := usersdict[username]; ok { //用户名已存在
 				return fmt.Errorf(i18n("user_exist"), username)
 			} else { //用户名不存在
+				logs.Info("[%s] %s", username, i18n("注册用户"))
 				usersdict[username] = UserDict{Password: password}
 				db.Store(_UsersDict, usersdict)
 			}
 		}
+	} else {
+		logs.Info("[%s] %s", username, i18n("注册用户"))
+		usersdict := make(map[string]UserDict)
+		usersdict[username] = UserDict{Password: password}
+		db.Store(_UsersDict, usersdict)
 	}
-	usersdict := make(map[string]UserDict)
-	usersdict[username] = UserDict{Password: password}
-	db.Store(_UsersDict, usersdict)
 	return nil
 }
 
