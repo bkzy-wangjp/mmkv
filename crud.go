@@ -157,6 +157,7 @@ func (db *MemoryKeyValueMap) deleteFromKeysDict(keys ...string) {
 	}
 }
 */
+
 //写单个标签
 func (db *MemoryKeyValueMap) MmWriteSingle(key string, value interface{}) (interface{}, error) {
 	//logs.Debug(i18n("log_debug_write_single"), key, value)

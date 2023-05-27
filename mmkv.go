@@ -6,7 +6,9 @@ import (
 	"net"
 	"path"
 	"reflect"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/beego/beego/v2/core/logs"
 	crc16 "github.com/bkzy-wangjp/CRC16"
@@ -83,6 +85,9 @@ func Run(users map[string]string, cfg map[string]interface{}) error {
 		return err
 	}
 	logs.Info(i18n("log_info_listen_port"), address)
+
+	go saveMemStats() //记录内存使用情况
+
 	var id int64 = 0
 	for {
 		id++
@@ -239,4 +244,19 @@ func isSysReservedKey(key string) bool {
 		}
 	}
 	return false
+}
+
+//保存内存信息
+func saveMemStats() {
+	for {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		Db.MmWriteSingle("sys.memstats.alloc", float64(m.Alloc)/(1024*1024))                  //当前堆上对象占用的内存大小
+		Db.MmWriteSingle("sys.memstats.totalalloc", float64(m.TotalAlloc)/(1024*1024))        //堆上总共分配出的内存大小
+		Db.MmWriteSingle("sys.memstats.totalfree", float64(m.TotalAlloc-m.Alloc)/(1024*1024)) //堆上空闲的内存大小
+		Db.MmWriteSingle("sys.memstats.sys", float64(m.Sys)/(1024*1024))                      //程序从操作系统总共申请的内存大小
+		Db.MmWriteSingle("sys.memstats.numgc", m.NumGC)                                       //垃圾回收运行的次数
+
+		time.Sleep(60 * time.Second) //每分钟记录一次
+	}
 }

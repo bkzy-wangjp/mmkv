@@ -36,8 +36,6 @@ const (
 var (
 	Db       MemoryKeyValueMap //内存数据库
 	ConnPool []*ConnHandel     //连接池
-	//_USER_DICT sync.Map          //用户字典
-	//_KEY_DICT  sync.Map          //标签字典
 
 	_FC_MAP = map[byte]string{
 		0x01: "连接测试",
