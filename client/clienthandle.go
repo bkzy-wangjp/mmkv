@@ -25,6 +25,7 @@ type ConnHandel struct {
 	RxTimes      int64     //接收次数
 	lastFc       byte      //最后一次写数据的功能码
 	lastRev      byte      //最后一次写数据的识别码
+	address      string    //连接地址
 	WorkeAt      time.Time //本次开始工作的时间
 	LoginAt      time.Time //登录时间
 	CreatedAt    time.Time //创建时间
@@ -50,6 +51,7 @@ func newConneHandle(timeout int64, username, password, address string) (*ConnHan
 //建立与服务器的连接
 func (h *ConnHandel) dial(addr string) error {
 	var err error
+	h.address = addr
 	if h.timeout == 0 {
 		h.Conn, err = net.Dial("tcp", addr)
 	} else {
@@ -267,7 +269,10 @@ func decodeResponse(hex_data []byte) (*RespMsg, error) {
 func (h *ConnHandel) request(funcCode byte, msg interface{}) (*RespMsg, float64, error) {
 	st := time.Now()
 	if !h.ConnServer {
-		return nil, time.Since(st).Seconds(), fmt.Errorf(i18n("尚未建立与mmkv服务器的连接"))
+		err := h.dial(h.address)
+		if err != nil {
+			return nil, time.Since(st).Seconds(), fmt.Errorf(i18n("尚未建立与mmkv服务器的连接"))
+		}
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
